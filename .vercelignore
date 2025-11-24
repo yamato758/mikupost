@@ -1,0 +1,7 @@
+# Vercelで無視するファイル
+data/
+.env
+.env.local
+*.log
+node_modules/
+
