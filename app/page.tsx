@@ -69,10 +69,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* X連携状態 */}
-        <div className="mb-6 animate-fade-in">
-          <TwitterStatus />
-        </div>
+        {/* X連携状態（未連携の場合のみ表示） */}
+        {!loading && !status?.connected && (
+          <div className="mb-6 animate-fade-in">
+            <TwitterStatus />
+          </div>
+        )}
 
         {/* 投稿フォーム */}
         <div className="bg-white/40 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
