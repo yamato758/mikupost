@@ -25,13 +25,19 @@ export async function GET(request: NextRequest) {
   
   // code_verifierをCookieに保存（コールバックで使用するため）
   const cookieStore = await cookies();
+  // Vercel環境では常にHTTPSなので、secure: trueとsameSite: 'none'を使用
+  const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
   cookieStore.set('oauth_code_verifier', verifier, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction, // Vercelでは常にHTTPS
+    sameSite: isProduction ? 'none' : 'lax', // 外部リダイレクト対応のため
     maxAge: 600, // 10分
     path: '/',
   });
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('OAuth code_verifier saved to cookie');
+  }
 
   // OAuth 2.0認証URLを生成
   const authUrl = new URL(`${TWITTER_AUTH_BASE}/authorize`);

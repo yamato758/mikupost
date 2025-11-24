@@ -13,25 +13,36 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const error = searchParams.get('error');
 
+  // ベースURLを正しく構築
+  const getBaseUrl = () => {
+    if (process.env.NEXTAUTH_URL) {
+      return process.env.NEXTAUTH_URL;
+    }
+    const proto = request.headers.get('x-forwarded-proto') || 'https';
+    const host = request.headers.get('host') || 'localhost:3000';
+    return `${proto}://${host}`;
+  };
+  const baseUrl = getBaseUrl();
+
   // エラーチェック
   if (error) {
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(ERROR_MESSAGES.AUTH_FAILED)}`, request.url)
-    );
+    const errorUrl = new URL('/', baseUrl);
+    errorUrl.searchParams.set('error', ERROR_MESSAGES.AUTH_FAILED);
+    return NextResponse.redirect(errorUrl.toString());
   }
 
   if (!code) {
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(ERROR_MESSAGES.AUTH_CODE_MISSING)}`, request.url)
-    );
+    const errorUrl = new URL('/', baseUrl);
+    errorUrl.searchParams.set('error', ERROR_MESSAGES.AUTH_CODE_MISSING);
+    return NextResponse.redirect(errorUrl.toString());
   }
 
   // 環境変数の検証
   const envValidation = validateEnvVars(['TWITTER_CLIENT_ID', 'TWITTER_CLIENT_SECRET', 'TWITTER_REDIRECT_URI']);
   if (!envValidation.valid) {
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(ERROR_MESSAGES.AUTH_CONFIG_INCOMPLETE)}`, request.url)
-    );
+    const errorUrl = new URL('/', baseUrl);
+    errorUrl.searchParams.set('error', ERROR_MESSAGES.AUTH_CONFIG_INCOMPLETE);
+    return NextResponse.redirect(errorUrl.toString());
   }
 
   const clientId = process.env.TWITTER_CLIENT_ID!;
@@ -40,13 +51,32 @@ export async function GET(request: NextRequest) {
 
   // Cookieからcode_verifierを取得
   const cookieStore = await cookies();
-  const codeVerifier = cookieStore.get('oauth_code_verifier')?.value;
+  const codeVerifierCookie = cookieStore.get('oauth_code_verifier');
+  const codeVerifier = codeVerifierCookie?.value;
+
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('Cookie check:', {
+      cookieExists: !!codeVerifierCookie,
+      hasValue: !!codeVerifier,
+      cookieName: codeVerifierCookie?.name,
+      requestUrl: request.url,
+      requestHeaders: Object.fromEntries(request.headers.entries()),
+    });
+  }
 
   if (!codeVerifier) {
-    console.error('code_verifier not found in cookies');
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent('認証セッションが無効です。再度連携してください。')}`, request.url)
-    );
+    console.error('code_verifier not found in cookies', {
+      cookieExists: !!codeVerifierCookie,
+      allCookies: cookieStore.getAll().map(c => c.name),
+      requestUrl: request.url,
+      origin: request.headers.get('origin'),
+      host: request.headers.get('host'),
+    });
+    
+    const errorUrl = new URL('/', baseUrl);
+    errorUrl.searchParams.set('error', '認証セッションが無効です。再度連携してください。');
+    
+    return NextResponse.redirect(errorUrl.toString());
   }
 
   try {
@@ -71,9 +101,9 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange error:', errorText);
-      return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent(ERROR_MESSAGES.TOKEN_EXCHANGE_FAILED)}`, request.url)
-      );
+      const errorUrl = new URL('/', baseUrl);
+      errorUrl.searchParams.set('error', ERROR_MESSAGES.TOKEN_EXCHANGE_FAILED);
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     const tokenData = (await tokenResponse.json()) as TwitterTokenResponse;
@@ -90,14 +120,14 @@ export async function GET(request: NextRequest) {
 
     await saveTokens(tokens);
 
-    return NextResponse.redirect(
-      new URL('/?success=認証が完了しました', request.url)
-    );
+    const successUrl = new URL('/', baseUrl);
+    successUrl.searchParams.set('success', '認証が完了しました');
+    return NextResponse.redirect(successUrl.toString());
   } catch (error) {
     console.error('OAuth callback error:', error);
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent('認証処理中にエラーが発生しました')}`, request.url)
-    );
+    const errorUrl = new URL('/', baseUrl);
+    errorUrl.searchParams.set('error', '認証処理中にエラーが発生しました');
+    return NextResponse.redirect(errorUrl.toString());
   }
 }
 
