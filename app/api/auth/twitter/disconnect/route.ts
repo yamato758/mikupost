@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteTokens } from '@/lib/token-manager';
+import { deleteTokens } from '@/lib/token-manager-kv';
 import { ERROR_MESSAGES } from '@/lib/constants';
 import { createSuccessResponse, createErrorResponse } from '@/lib/utils';
 
@@ -9,7 +9,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/utils';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // トークンを削除
-    deleteTokens();
+    await deleteTokens();
     
     return NextResponse.json(
       createSuccessResponse({ message: 'X連携を解除しました' })

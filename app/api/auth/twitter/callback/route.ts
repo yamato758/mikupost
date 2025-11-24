@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveTokens } from '@/lib/token-manager';
+import { saveTokens } from '@/lib/token-manager-kv';
 import { TwitterTokens, TwitterTokenResponse } from '@/lib/types';
 import { TWITTER_API_BASE, ERROR_MESSAGES, OAUTH_STATE } from '@/lib/constants';
 import { validateEnvVars } from '@/lib/utils';
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       token_type: tokenData.token_type || 'bearer',
     };
 
-    saveTokens(tokens);
+    await saveTokens(tokens);
 
     return NextResponse.redirect(
       new URL('/?success=認証が完了しました', request.url)

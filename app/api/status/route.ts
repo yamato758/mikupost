@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadTokens, isTokenValid } from '@/lib/token-manager';
+import { loadTokens, isTokenValid } from '@/lib/token-manager-kv';
 import { getMe } from '@/lib/twitter-client';
 import { TwitterStatusResponse } from '@/lib/types';
 
@@ -7,7 +7,7 @@ import { TwitterStatusResponse } from '@/lib/types';
  * X連携状態確認エンドポイント
  */
 export async function GET(): Promise<NextResponse<TwitterStatusResponse>> {
-  const tokens = loadTokens();
+  const tokens = await loadTokens();
   
   if (!isTokenValid(tokens)) {
     return NextResponse.json({

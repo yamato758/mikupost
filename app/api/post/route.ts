@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadTokens, isTokenValid } from '@/lib/token-manager';
+import { loadTokens, isTokenValid } from '@/lib/token-manager-kv';
 import { generateImage } from '@/lib/image-generator';
 import { createTweet } from '@/lib/twitter-client';
 import { PostResponse, ErrorResponse } from '@/lib/types';
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
     }
 
     // X連携状態を確認
-    const tokens = loadTokens();
+    const tokens = await loadTokens();
     if (!isTokenValid(tokens)) {
       return NextResponse.json(
         createErrorResponse(ERROR_MESSAGES.NOT_CONNECTED, 'auth', 401),

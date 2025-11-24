@@ -5,7 +5,7 @@ import {
   TwitterUserResponse,
   TwitterApiError,
 } from './types';
-import { loadTokens } from './token-manager';
+import { loadTokens } from './token-manager-kv';
 import { fetchImageAsBuffer } from './image-generator';
 import { TWITTER_API_BASE, ERROR_MESSAGES, MEDIA_PROCESSING_WAIT_TIME } from './constants';
 
@@ -15,7 +15,7 @@ import { TWITTER_API_BASE, ERROR_MESSAGES, MEDIA_PROCESSING_WAIT_TIME } from './
  * v2ではmultipart/form-data形式で単一リクエストでアップロード
  */
 async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
-  const tokens = loadTokens();
+  const tokens = await loadTokens();
   if (!tokens || !tokens.access_token) {
     throw new Error('アクセストークンがありません');
   }
@@ -126,7 +126,7 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
  * X API v2でツイートを作成
  */
 export async function createTweet(text: string, imageUrl?: string): Promise<{ tweetId: string; tweetUrl: string } | null> {
-  const tokens = loadTokens();
+  const tokens = await loadTokens();
   if (!tokens || !tokens.access_token) {
     throw new Error('アクセストークンがありません');
   }
@@ -205,7 +205,7 @@ export async function createTweet(text: string, imageUrl?: string): Promise<{ tw
  * ユーザー情報を取得（認証状態確認用）
  */
 export async function getMe(): Promise<{ id: string; username: string } | null> {
-  const tokens = loadTokens();
+  const tokens = await loadTokens();
   if (!tokens || !tokens.access_token) {
     return null;
   }
