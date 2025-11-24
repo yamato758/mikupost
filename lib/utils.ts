@@ -59,11 +59,11 @@ export function createErrorResponse(
 /**
  * 成功レスポンスの作成
  */
-export function createSuccessResponse<T extends Record<string, unknown>>(data: T) {
+export function createSuccessResponse<T extends Record<string, unknown>>(data: T): T & { success: true } {
   return {
     success: true as const,
     ...data,
-  };
+  } as T & { success: true };
 }
 
 /**

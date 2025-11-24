@@ -29,8 +29,9 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
     // v2 APIではmultipart/form-data形式で単一リクエストでアップロード
     // Node.js 18以降のネイティブFormDataとBlobを使用
     const formData = new FormData();
-    // Blobとして画像データを追加
-    const blob = new Blob([imageBuffer], { type: 'image/png' });
+    // Blobとして画像データを追加（BufferをUint8Arrayに変換）
+    const uint8Array = new Uint8Array(imageBuffer);
+    const blob = new Blob([uint8Array], { type: 'image/png' });
     formData.append('media', blob, 'image.png');
     formData.append('media_category', 'tweet_image');
 

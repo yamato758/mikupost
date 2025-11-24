@@ -55,13 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
       );
     }
 
-    return NextResponse.json(
-      createSuccessResponse<PostResponse>({
-        tweetId: tweetResult.tweetId,
-        tweetUrl: tweetResult.tweetUrl,
-        imageUrl: imageUrl,
-      })
-    );
+    return NextResponse.json({
+      success: true,
+      tweetId: tweetResult.tweetId,
+      tweetUrl: tweetResult.tweetUrl,
+      imageUrl: imageUrl,
+    } as PostResponse);
   } catch (error) {
     console.error('Post API error:', error);
     return NextResponse.json(
