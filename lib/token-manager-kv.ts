@@ -9,13 +9,33 @@ import { ERROR_MESSAGES } from './constants';
 const TOKEN_KEY = 'twitter_tokens';
 
 /**
- * Vercel KVが利用可能かどうかをチェック
+ * Vercel KVまたはUpstash KVが利用可能かどうかをチェック
+ * Upstash KVの環境変数名にも対応
  */
 function isKvAvailable(): boolean {
-  return !!(
-    process.env.KV_REST_API_URL &&
-    process.env.KV_REST_API_TOKEN
-  );
+  // Vercel KVの環境変数名
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    return true;
+  }
+  // Upstash KVの環境変数名
+  if (process.env.UPSTASH_KV_REST_API_URL && process.env.UPSTASH_KV_REST_API_TOKEN) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * KV REST APIのURLを取得
+ */
+function getKvRestApiUrl(): string | undefined {
+  return process.env.KV_REST_API_URL || process.env.UPSTASH_KV_REST_API_URL;
+}
+
+/**
+ * KV REST APIのトークンを取得
+ */
+function getKvRestApiToken(): string | undefined {
+  return process.env.KV_REST_API_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN;
 }
 
 /**
@@ -23,13 +43,21 @@ function isKvAvailable(): boolean {
  */
 export async function loadTokens(): Promise<TwitterTokens | null> {
   try {
-    // Vercel KVが利用可能な場合
+    // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
+      const kvUrl = getKvRestApiUrl();
+      const kvToken = getKvRestApiToken();
+      
+      if (!kvUrl || !kvToken) {
+        console.error('KV credentials are incomplete');
+        return null;
+      }
+
       const response = await fetch(
-        `${process.env.KV_REST_API_URL}/get/${TOKEN_KEY}`,
+        `${kvUrl}/get/${TOKEN_KEY}`,
         {
           headers: {
-            'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+            'Authorization': `Bearer ${kvToken}`,
           },
         }
       );
@@ -69,14 +97,21 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
  */
 export async function saveTokens(tokens: TwitterTokens): Promise<void> {
   try {
-    // Vercel KVが利用可能な場合
+    // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
+      const kvUrl = getKvRestApiUrl();
+      const kvToken = getKvRestApiToken();
+      
+      if (!kvUrl || !kvToken) {
+        throw new Error('KV credentials are incomplete');
+      }
+
       const response = await fetch(
-        `${process.env.KV_REST_API_URL}/set/${TOKEN_KEY}`,
+        `${kvUrl}/set/${TOKEN_KEY}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+            'Authorization': `Bearer ${kvToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -114,14 +149,22 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
  */
 export async function deleteTokens(): Promise<void> {
   try {
-    // Vercel KVが利用可能な場合
+    // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
+      const kvUrl = getKvRestApiUrl();
+      const kvToken = getKvRestApiToken();
+      
+      if (!kvUrl || !kvToken) {
+        console.error('KV credentials are incomplete');
+        return;
+      }
+
       const response = await fetch(
-        `${process.env.KV_REST_API_URL}/del/${TOKEN_KEY}`,
+        `${kvUrl}/del/${TOKEN_KEY}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+            'Authorization': `Bearer ${kvToken}`,
           },
         }
       );
