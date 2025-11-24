@@ -1,0 +1,108 @@
+/**
+ * Vercel KVを使用したトークン管理の実装例
+ * 
+ * 使用方法:
+ * 1. Vercel KVをプロジェクトに追加
+ * 2. 環境変数に KV_REST_API_URL, KV_REST_API_TOKEN を設定
+ * 3. このファイルを lib/token-manager-kv.ts にコピー
+ * 4. lib/token-manager.ts をこの実装に置き換える
+ */
+
+import { TwitterTokens } from './types';
+import { ERROR_MESSAGES } from './constants';
+
+// Vercel KVのインポート（@vercel/kvパッケージが必要）
+// import { kv } from '@vercel/kv';
+
+const TOKEN_KEY = 'twitter_tokens';
+
+/**
+ * アクセストークンを読み込む
+ */
+export async function loadTokens(): Promise<TwitterTokens | null> {
+  try {
+    // const tokens = await kv.get<TwitterTokens>(TOKEN_KEY);
+    // return tokens;
+    
+    // 実装例:
+    // if (!process.env.KV_REST_API_URL) {
+    //   throw new Error('KV_REST_API_URL is not set');
+    // }
+    // const response = await fetch(`${process.env.KV_REST_API_URL}/get/${TOKEN_KEY}`, {
+    //   headers: {
+    //     'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+    //   },
+    // });
+    // const data = await response.json();
+    // return data.result ? JSON.parse(data.result) : null;
+    
+    return null;
+  } catch (error) {
+    console.error(ERROR_MESSAGES.TOKEN_LOAD_FAILED, error);
+    return null;
+  }
+}
+
+/**
+ * アクセストークンを保存する
+ */
+export async function saveTokens(tokens: TwitterTokens): Promise<void> {
+  try {
+    // await kv.set(TOKEN_KEY, tokens);
+    
+    // 実装例:
+    // if (!process.env.KV_REST_API_URL) {
+    //   throw new Error('KV_REST_API_URL is not set');
+    // }
+    // await fetch(`${process.env.KV_REST_API_URL}/set/${TOKEN_KEY}`, {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify({ value: JSON.stringify(tokens) }),
+    // });
+  } catch (error) {
+    console.error(ERROR_MESSAGES.TOKEN_SAVE_FAILED, error);
+    throw new Error(ERROR_MESSAGES.TOKEN_SAVE_FAILED);
+  }
+}
+
+/**
+ * トークンを削除する
+ */
+export async function deleteTokens(): Promise<void> {
+  try {
+    // await kv.del(TOKEN_KEY);
+    
+    // 実装例:
+    // if (!process.env.KV_REST_API_URL) {
+    //   return;
+    // }
+    // await fetch(`${process.env.KV_REST_API_URL}/del/${TOKEN_KEY}`, {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+    //   },
+    // });
+  } catch (error) {
+    console.error(ERROR_MESSAGES.TOKEN_DELETE_FAILED, error);
+  }
+}
+
+/**
+ * トークンが有効かどうかをチェック
+ */
+export function isTokenValid(tokens: TwitterTokens | null): boolean {
+  if (!tokens || !tokens.access_token) {
+    return false;
+  }
+  
+  if (tokens.expires_at) {
+    const now = Math.floor(Date.now() / 1000);
+    return tokens.expires_at > now;
+  }
+  
+  return true;
+}
+
