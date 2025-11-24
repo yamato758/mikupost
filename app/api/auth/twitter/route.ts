@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   // code_verifierをCookieに保存（コールバックで使用するため）
   const cookieStore = await cookies();
   // Vercel環境では常にHTTPSなので、secure: trueとsameSite: 'none'を使用
-  const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
   cookieStore.set('oauth_code_verifier', verifier, {
     httpOnly: true,
     secure: isProduction, // Vercelでは常にHTTPS
