@@ -3,6 +3,7 @@ import { saveTokens } from '@/lib/token-manager-kv';
 import { TwitterTokens, TwitterTokenResponse } from '@/lib/types';
 import { TWITTER_API_BASE, ERROR_MESSAGES, OAUTH_STATE } from '@/lib/constants';
 import { validateEnvVars } from '@/lib/utils';
+import { cookies } from 'next/headers';
 
 /**
  * X OAuth 2.0コールバックエンドポイント
@@ -37,6 +38,17 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
   const redirectUri = process.env.TWITTER_REDIRECT_URI!;
 
+  // Cookieからcode_verifierを取得
+  const cookieStore = await cookies();
+  const codeVerifier = cookieStore.get('oauth_code_verifier')?.value;
+
+  if (!codeVerifier) {
+    console.error('code_verifier not found in cookies');
+    return NextResponse.redirect(
+      new URL(`/?error=${encodeURIComponent('認証セッションが無効です。再度連携してください。')}`, request.url)
+    );
+  }
+
   try {
     // アクセストークンを取得
     const tokenResponse = await fetch(`${TWITTER_API_BASE}/oauth2/token`, {
@@ -49,9 +61,12 @@ export async function GET(request: NextRequest) {
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: redirectUri,
-        code_verifier: 'challenge', // PKCE用（簡易実装）
+        code_verifier: codeVerifier,
       }),
     });
+
+    // 使用済みのcode_verifierをCookieから削除
+    cookieStore.delete('oauth_code_verifier');
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
