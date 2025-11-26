@@ -5,19 +5,17 @@ import { GEMINI_API_URL, ERROR_MESSAGES } from './constants';
  * 画像生成用のプロンプトを生成
  */
 function buildPrompt(userText: string): string {
-  return `Create an ultra cute chibi Hatsune Miku illustration themed around "${userText}".
+  return `Create an ultra cute chibi Hatsune Miku illustration.
 
-Character: super deformed chibi style, oversized head, tiny adorable body, big sparkling eyes with star and heart highlights, long flowing twintails with soft gradients, rosy pink cheeks, sweet innocent smile, small cute hands.
+IMPORTANT - The theme is "${userText}". Miku's expression, pose, and the entire scene MUST directly reflect and express "${userText}". Her facial expression and body language should clearly show the feeling or situation of "${userText}".
 
-Style: kawaii, soft anime, pastel fantasy, fairy kei inspired, cotton candy aesthetic.
+Character: super deformed chibi style, oversized head, tiny adorable body, big expressive eyes that show the emotion of "${userText}", long flowing twintails with soft cyan-teal gradients, cheeks colored to match the mood, pose and gesture matching "${userText}".
 
-Atmosphere: dreamy ethereal glow, soft fluffy clouds, floating pastel bubbles, magical sparkles and glitter, scattered stars and hearts, rainbow light rays, bokeh effect, soft gradient background in pink, lavender and mint colors.
+Style: kawaii, soft anime, pastel fantasy, cotton candy aesthetic.
 
-Lighting: soft diffused lighting, gentle glow around character, iridescent highlights.
+Atmosphere: background and mood elements that represent "${userText}", soft dreamy glow, magical sparkles, soft gradient background.
 
-Quality: masterpiece, best quality, ultra-detailed, 8k resolution, professional illustration, pixiv ranking, trending on artstation.
-
-Mood: pure, innocent, angelic, heartwarming, magical girl vibes.
+Quality: masterpiece, best quality, ultra-detailed, 8k resolution, professional illustration.
 
 No text, no letters, no writing, no words, no signs, no symbols in the image.`;
 }
