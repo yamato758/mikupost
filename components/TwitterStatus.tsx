@@ -1,28 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { TwitterStatusResponse } from '@/lib/types';
 
-export default function TwitterStatus() {
-  const [status, setStatus] = useState<TwitterStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+interface TwitterStatusProps {
+  status: TwitterStatusResponse | null;
+  onStatusChange?: () => void;
+}
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
-
-  const checkStatus = async () => {
-    try {
-      const response = await fetch('/api/status');
-      const data = await response.json();
-      setStatus(data);
-    } catch (error) {
-      console.error('Failed to check status:', error);
-      setStatus({ connected: false });
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function TwitterStatus({ status, onStatusChange }: TwitterStatusProps) {
+  const loading = status === null;
 
   const handleConnect = () => {
     window.location.href = '/api/auth/twitter';
@@ -40,8 +26,10 @@ export default function TwitterStatus() {
       const data = await response.json();
       
       if (data.success) {
-        // ステータスを更新
-        await checkStatus();
+        // 親コンポーネントにステータス更新を通知
+        if (onStatusChange) {
+          onStatusChange();
+        }
         alert('X連携を解除しました');
       } else {
         alert('連携解除に失敗しました: ' + (data.error || '不明なエラー'));

@@ -69,10 +69,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* X連携状態（未連携の場合のみ表示） */}
-        {!loading && !status?.connected && (
+        {/* X連携状態 */}
+        {!loading && (
           <div className="mb-6 animate-fade-in">
-            <TwitterStatus />
+            <TwitterStatus status={status} onStatusChange={checkStatus} />
           </div>
         )}
 
