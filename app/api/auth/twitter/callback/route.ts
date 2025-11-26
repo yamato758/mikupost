@@ -55,19 +55,29 @@ export async function GET(request: NextRequest) {
   let sessionId: string | null = null;
   if (state && state.startsWith(`${OAUTH_STATE}:`)) {
     sessionId = state.split(':')[1];
+  } else if (state) {
+    // stateが存在するが、期待される形式でない場合
+    console.warn('Unexpected state format:', state);
   }
 
   // KVからcode_verifierを取得（優先）
   let codeVerifier: string | null = null;
   if (sessionId) {
-    codeVerifier = await getSession(sessionId);
-    if (codeVerifier) {
-      // 使用済みのセッションを削除
-      await deleteSession(sessionId);
+    try {
+      codeVerifier = await getSession(sessionId);
+      if (codeVerifier) {
+        // 使用済みのセッションを削除
+        await deleteSession(sessionId);
+        if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+          console.log('Code verifier retrieved from KV');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get session from KV:', error);
     }
   }
 
-  // フォールバック: Cookieから取得（開発環境用）
+  // フォールバック: Cookieから取得
   if (!codeVerifier) {
     const cookieStore = await cookies();
     const codeVerifierCookie = cookieStore.get('oauth_code_verifier');
@@ -76,6 +86,9 @@ export async function GET(request: NextRequest) {
     if (codeVerifier) {
       // 使用済みのCookieを削除
       cookieStore.delete('oauth_code_verifier');
+      if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+        console.log('Code verifier retrieved from Cookie');
+      }
     }
   }
 
@@ -83,8 +96,10 @@ export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
     console.log('Session check:', {
       hasState: !!state,
+      stateValue: state,
       sessionId,
       hasCodeVerifier: !!codeVerifier,
+      codeVerifierLength: codeVerifier?.length || 0,
       requestUrl: request.url,
     });
   }

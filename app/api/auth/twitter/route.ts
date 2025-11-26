@@ -27,14 +27,26 @@ export async function GET(request: NextRequest) {
   // セッションIDを生成
   const sessionId = generateSessionId();
   
-  // code_verifierをKVに保存（Cookieに依存しない方法）
+  // code_verifierをKVに保存（優先）、失敗した場合はCookieに保存
+  const cookieStore = await cookies();
+  const isProduction: boolean = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+  
+  let kvSaved = false;
   try {
     await saveSession(sessionId, verifier);
+    kvSaved = true;
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+      console.log('Session saved to KV successfully');
+    }
   } catch (error) {
-    console.error('Failed to save session:', error);
-    // フォールバック: Cookieにも保存（開発環境用）
-    const cookieStore = await cookies();
-    const isProduction: boolean = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    console.error('Failed to save session to KV:', error);
+    // KV保存に失敗した場合は、Cookieに保存（フォールバック）
+    kvSaved = false;
+  }
+  
+  // KVに保存できなかった場合、または念のためCookieにも保存
+  // Vercel環境ではCookieが確実に動作するとは限らないため、両方に保存
+  try {
     cookieStore.set('oauth_code_verifier', verifier, {
       httpOnly: true,
       secure: isProduction,
@@ -42,6 +54,15 @@ export async function GET(request: NextRequest) {
       maxAge: 600,
       path: '/',
     });
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+      console.log('Session saved to Cookie as fallback');
+    }
+  } catch (cookieError) {
+    console.error('Failed to save session to Cookie:', cookieError);
+    // Cookie保存にも失敗した場合は、エラーをスロー
+    if (!kvSaved) {
+      throw new Error('Failed to save session to both KV and Cookie');
+    }
   }
   
   // デバッグ用

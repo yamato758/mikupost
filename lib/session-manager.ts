@@ -50,12 +50,13 @@ export function generateSessionId(): string {
 export async function saveSession(sessionId: string, codeVerifier: string): Promise<void> {
   try {
     if (!isKvAvailable()) {
-      // ビルド時や開発環境でKVが利用できない場合は、エラーをスローせずに警告のみ
-      if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+      // Vercel環境でKVが利用できない場合はエラーをスロー（Cookieフォールバックを実行させるため）
+      if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
         throw new Error('KVが利用できません。Vercel KVまたはUpstash KVの設定を確認してください。');
       }
+      // 開発環境では警告のみ
       console.warn('KVが利用できません。開発環境ではCookieフォールバックを使用します。');
-      return; // ビルド時はエラーをスローしない
+      throw new Error('KVが利用できません'); // 開発環境でもエラーをスローしてCookieフォールバックを実行
     }
 
     const kvUrl = getKvRestApiUrl();
