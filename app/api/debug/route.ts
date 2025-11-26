@@ -137,6 +137,9 @@ export async function GET(request: NextRequest) {
       TWITTER_CLIENT_SECRET: !!process.env.TWITTER_CLIENT_SECRET,
       TWITTER_REDIRECT_URI: process.env.TWITTER_REDIRECT_URI || '(not set)',
       
+      // 画像生成API
+      NANO_BANANA_API_TOKEN: !!process.env.NANO_BANANA_API_TOKEN,
+      
       // その他
       NEXTAUTH_URL: process.env.NEXTAUTH_URL || '(not set)',
       VERCEL: !!process.env.VERCEL,
