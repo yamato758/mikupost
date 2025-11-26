@@ -1,9 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * デバッグ用エンドポイント - 環境変数とKV接続の確認
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const action = searchParams.get('action');
+  
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN;
+  
+  // トークン削除アクション
+  if (action === 'delete_token' && kvUrl && kvToken) {
+    try {
+      const delResponse = await fetch(
+        `${kvUrl}/del/twitter_tokens`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${kvToken}`,
+          },
+        }
+      );
+      const delResult = await delResponse.json();
+      return NextResponse.json({
+        action: 'delete_token',
+        success: delResponse.ok,
+        result: delResult,
+      });
+    } catch (error) {
+      return NextResponse.json({
+        action: 'delete_token',
+        success: false,
+        error: String(error),
+      });
+    }
+  }
   const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN;
   
