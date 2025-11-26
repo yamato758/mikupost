@@ -15,16 +15,28 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const state = searchParams.get('state');
 
-  // ベースURLを正しく構築
+  // ベースURLを正しく構築（リクエストヘッダーから動的に取得）
   const getBaseUrl = () => {
+    // Vercel環境ではリクエストヘッダーからホストを取得
+    const host = request.headers.get('host');
+    const proto = request.headers.get('x-forwarded-proto') || 'https';
+    
+    if (host && !host.includes('localhost')) {
+      return `${proto}://${host}`;
+    }
+    
+    // フォールバック: NEXTAUTH_URLを使用（開発環境用）
     if (process.env.NEXTAUTH_URL) {
       return process.env.NEXTAUTH_URL;
     }
-    const proto = request.headers.get('x-forwarded-proto') || 'https';
-    const host = request.headers.get('host') || 'localhost:3000';
-    return `${proto}://${host}`;
+    
+    return `${proto}://${host || 'localhost:3000'}`;
   };
   const baseUrl = getBaseUrl();
+  
+  if (process.env.VERCEL) {
+    console.log('Callback baseUrl:', baseUrl);
+  }
 
   // エラーチェック
   if (error) {
