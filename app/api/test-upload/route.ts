@@ -38,24 +38,24 @@ export async function GET(request: NextRequest) {
     });
   }
   
-  // 4. メディアアップロード
+  // 4. メディアアップロード（base64形式）
   console.log('Uploading media, buffer size:', imageBuffer.length);
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_KV_REST_API_URL;
   
   try {
-    const uint8Array = new Uint8Array(imageBuffer);
-    const formData = new FormData();
-    if (typeof Blob !== 'undefined') {
-      formData.append('media', new Blob([uint8Array], { type: 'image/png' }), 'image.png');
-    }
-    formData.append('media_category', 'tweet_image');
+    // base64エンコード
+    const base64Media = imageBuffer.toString('base64');
+    console.log('Base64 length:', base64Media.length);
 
     const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData,
+      body: new URLSearchParams({
+        media_data: base64Media,
+        media_category: 'tweet_image',
+      }),
     });
 
     const responseText = await uploadResponse.text();
@@ -66,12 +66,20 @@ export async function GET(request: NextRequest) {
       // JSON解析失敗
     }
 
+    // レスポンスヘッダーも取得
+    const responseHeaders: Record<string, string> = {};
+    uploadResponse.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
     return NextResponse.json({
       step: 'media_upload',
       bufferSize: imageBuffer.length,
+      base64Length: base64Media.length,
       uploadStatus: uploadResponse.status,
       uploadOk: uploadResponse.ok,
-      responseText: responseText.substring(0, 500),
+      responseHeaders,
+      responseText: responseText.substring(0, 1000),
       responseJson,
     });
   } catch (error) {
