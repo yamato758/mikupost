@@ -1,28 +1,28 @@
 # ミクポスト (MikuPost)
 
-テキストを入力するだけで、初音ミクの画像を自動生成してX（旧Twitter）にポストできるWebアプリケーションです。
+テキストを入力するだけで、初音ミクのかわいいちび画像を自動生成してX（旧Twitter）にポストできるWebアプリケーションです。
 
 ## 機能
 
 - **Xアカウント連携**: OAuth 2.0を使用した安全なXアカウント連携
-- **画像自動生成**: 入力テキストをもとに初音ミクの画像を自動生成（Replicate API使用）
-- **自動投稿**: 生成した画像付きでXに自動投稿
+- **画像自動生成**: 入力テキストをもとに初音ミクのちびキャラ画像を自動生成（Gemini 2.5 Flash Image API使用）
+- **自動投稿**: 生成した画像付きでXに自動投稿（OAuth 1.0aでメディアアップロード）
 - **エラーハンドリング**: 分かりやすいエラーメッセージ表示
 
 ## 技術スタック
 
 - **フロントエンド**: Next.js 14 (App Router) + TypeScript + React
-- **スタイリング**: Tailwind CSS（半透明背景、バックドロップブラー、アニメーション）
+- **スタイリング**: Tailwind CSS
 - **バックエンド**: Next.js API Routes
-- **画像生成**: Replicate API (Stable Diffusion)
-- **X API**: Twitter API v2 (OAuth 2.0)
+- **画像生成**: Gemini 2.5 Flash Image API (Nano Banana)
+- **X API**: Twitter API v2 (OAuth 2.0) + v1.1 Media Upload (OAuth 1.0a)
+- **データストレージ**: Vercel KV / Upstash KV
 
 ## セットアップ
 
 ### 1. 依存パッケージのインストール
 
 ```bash
-cd mikupost
 npm install
 ```
 
@@ -31,13 +31,23 @@ npm install
 `.env.local`ファイルを作成し、以下の環境変数を設定してください：
 
 ```env
-# X (Twitter) API
+# X (Twitter) API - OAuth 2.0
 TWITTER_CLIENT_ID=your_client_id
 TWITTER_CLIENT_SECRET=your_client_secret
 TWITTER_REDIRECT_URI=http://localhost:3000/api/auth/twitter/callback
 
-# 画像生成API (Replicate)
-REPLICATE_API_TOKEN=your_replicate_token
+# X (Twitter) API - OAuth 1.0a（メディアアップロード用）
+TWITTER_API_KEY=your_api_key
+TWITTER_API_SECRET=your_api_secret
+TWITTER_ACCESS_TOKEN=your_access_token
+TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret
+
+# 画像生成API (Gemini)
+NANO_BANANA_API_TOKEN=your_gemini_api_key
+
+# Vercel KV / Upstash KV（トークン保存用）
+UPSTASH_KV_REST_API_URL=your_kv_url
+UPSTASH_KV_REST_API_TOKEN=your_kv_token
 
 # Next.js
 NEXTAUTH_URL=http://localhost:3000
@@ -47,22 +57,31 @@ NEXTAUTH_URL=http://localhost:3000
 
 1. [Twitter Developer Portal](https://developer.twitter.com/)にアクセス
 2. 新しいアプリを作成
-3. OAuth 2.0設定を有効化
-4. コールバックURLを設定: `http://localhost:3000/api/auth/twitter/callback`
-5. 必要なスコープを設定:
-   - `tweet.read`
-   - `tweet.write`
-   - `users.read`
-   - `offline.access`
-6. Client IDとClient Secretを取得して`.env.local`に設定
+3. **User authentication settings**で以下を設定：
+   - App permissions: **Read and write**
+   - Type of App: **Web App, Automated App or Bot**
+   - Callback URL: `http://localhost:3000/api/auth/twitter/callback`
+4. **Keys and tokens**から以下を取得：
+   - API Key (Consumer Key)
+   - API Key Secret (Consumer Secret)
+   - Client ID
+   - Client Secret
+   - Access Token（Read and write権限で生成）
+   - Access Token Secret
 
-### 4. Replicate APIの設定
+### 4. Gemini APIの設定
 
-1. [Replicate](https://replicate.com/)にアカウントを作成
-2. APIトークンを取得
-3. `.env.local`に`REPLICATE_API_TOKEN`を設定
+1. [Google AI Studio](https://aistudio.google.com/)でAPIキーを取得
+2. `.env.local`に`NANO_BANANA_API_TOKEN`として設定
 
-### 5. 開発サーバーの起動
+### 5. Upstash KVの設定（Vercel以外の場合）
+
+1. [Upstash](https://upstash.com/)でアカウントを作成
+2. Redis データベースを作成
+3. REST API URLとTokenを取得
+4. `.env.local`に設定
+
+### 6. 開発サーバーの起動
 
 ```bash
 npm run dev
@@ -89,26 +108,58 @@ npm run dev
 
 ```
 mikupost/
-├── app/                    # Next.js App Router
-│   ├── api/               # API Routes
-│   │   ├── auth/         # OAuth認証
-│   │   ├── post/         # 投稿エンドポイント
-│   │   └── status/       # 連携状態確認
-│   ├── layout.tsx        # ルートレイアウト
-│   ├── page.tsx          # トップページ
-│   └── globals.css       # グローバルスタイル
-├── components/           # Reactコンポーネント
-│   ├── PostForm.tsx     # 投稿フォーム
-│   ├── TwitterStatus.tsx # X連携状態表示
-│   ├── LoadingSpinner.tsx # ローディング表示
-│   └── ErrorMessage.tsx  # エラーメッセージ
-├── lib/                  # ユーティリティ
-│   ├── types.ts         # TypeScript型定義
-│   ├── token-manager.ts # トークン管理
-│   ├── image-generator.ts # 画像生成
-│   └── twitter-client.ts # X APIクライアント
-└── data/                 # データ保存（.gitignore対象）
-    └── tokens.json       # アクセストークン
+├── app/                      # Next.js App Router
+│   ├── api/                  # API Routes
+│   │   ├── auth/twitter/     # OAuth認証
+│   │   ├── post/             # 投稿エンドポイント
+│   │   └── status/           # 連携状態確認
+│   ├── layout.tsx            # ルートレイアウト
+│   ├── page.tsx              # トップページ
+│   └── globals.css           # グローバルスタイル
+├── components/               # Reactコンポーネント
+│   ├── PostForm.tsx          # 投稿フォーム
+│   ├── TwitterStatus.tsx     # X連携状態表示
+│   ├── LoadingSpinner.tsx    # ローディング表示
+│   └── ErrorMessage.tsx      # エラーメッセージ
+└── lib/                      # ユーティリティ
+    ├── types.ts              # TypeScript型定義
+    ├── constants.ts          # 定数定義
+    ├── token-manager-kv.ts   # KVトークン管理
+    ├── session-manager.ts    # セッション管理
+    ├── oauth-pkce.ts         # OAuth PKCE
+    ├── oauth1-upload.ts      # OAuth 1.0aメディアアップロード
+    ├── image-generator.ts    # 画像生成
+    └── twitter-client.ts     # X APIクライアント
+```
+
+## Vercelへのデプロイ
+
+### 1. 必要な環境変数
+
+Vercelのプロジェクト設定で以下の環境変数を設定：
+
+| 変数名 | 説明 |
+|--------|------|
+| `TWITTER_CLIENT_ID` | OAuth 2.0 Client ID |
+| `TWITTER_CLIENT_SECRET` | OAuth 2.0 Client Secret |
+| `TWITTER_REDIRECT_URI` | `https://your-domain.vercel.app/api/auth/twitter/callback` |
+| `TWITTER_API_KEY` | API Key (Consumer Key) |
+| `TWITTER_API_SECRET` | API Key Secret |
+| `TWITTER_ACCESS_TOKEN` | Access Token (Read and write権限) |
+| `TWITTER_ACCESS_TOKEN_SECRET` | Access Token Secret |
+| `NANO_BANANA_API_TOKEN` | Gemini API Key |
+| `NEXTAUTH_URL` | `https://your-domain.vercel.app` |
+
+### 2. Vercel KVの設定
+
+1. Vercelプロジェクトで **Storage** → **Create Database** → **KV**
+2. 自動的に環境変数が設定されます
+
+### 3. X Developer Portalの更新
+
+Callback URLを本番URLに更新：
+```
+https://your-domain.vercel.app/api/auth/twitter/callback
 ```
 
 ## エラーハンドリング
@@ -116,58 +167,39 @@ mikupost/
 アプリケーションは以下のエラーを適切に処理します：
 
 - **画像生成失敗**: 「画像生成に失敗しました。時間をおいて再度お試しください。」
+- **APIの利用制限**: 「APIの利用制限に達しました。しばらく時間をおいてから再度お試しください。」
 - **Xメディアアップロード失敗**: 「画像のアップロードに失敗しました。」
 - **Xポスト失敗**: 「Xへのポストに失敗しました。」
 - **ネットワークエラー**: 「ネットワークエラーが発生しました。接続を確認してください。」
-
-## セキュリティ
-
-- アクセストークンは`data/tokens.json`に保存されます（`.gitignore`対象）
-- 環境変数は`.env.local`で管理（`.gitignore`対象）
-- CSRF対策: Next.js標準機能を使用
-- XSS対策: React標準機能を使用
-
-## 注意事項
-
-- 初音ミクのキャラクター利用ガイドラインに準拠した利用を前提としています
-- 画像生成API（Replicate）の利用には料金が発生する場合があります
-- X APIの利用には利用規約を遵守してください
-- 本番環境では、アクセストークンの保存にデータベースを使用することを推奨します
 
 ## トラブルシューティング
 
 ### X連携が失敗する場合
 
-- `.env.local`の`TWITTER_CLIENT_ID`と`TWITTER_CLIENT_SECRET`が正しく設定されているか確認
+- 環境変数が正しく設定されているか確認
 - コールバックURLがX Developer Portalで正しく設定されているか確認
-- 必要なスコープが設定されているか確認
+- Access Tokenが「Read and write」権限で生成されているか確認
 
 ### 画像生成が失敗する場合
 
-- `.env.local`の`REPLICATE_API_TOKEN`が正しく設定されているか確認
-- Replicate APIの利用制限に達していないか確認
-- ネットワーク接続を確認
+- `NANO_BANANA_API_TOKEN`が正しく設定されているか確認
+- Gemini APIの利用制限に達していないか確認
 
-### 投稿が失敗する場合
+### 画像がポストされない場合
 
-- Xアカウントが正しく連携されているか確認（`/api/status`で確認可能）
-- X APIの利用制限に達していないか確認
-- 画像サイズが大きすぎないか確認（推奨: 5MB以下）
+- OAuth 1.0a用の4つの環境変数がすべて設定されているか確認：
+  - `TWITTER_API_KEY`
+  - `TWITTER_API_SECRET`
+  - `TWITTER_ACCESS_TOKEN`
+  - `TWITTER_ACCESS_TOKEN_SECRET`
+- Access Tokenが「Read and write」権限で生成されているか確認
 
-## デプロイ
+## 注意事項
 
-詳細なデプロイ手順は [DEPLOY.md](./DEPLOY.md) を参照してください。
-
-### クイックスタート（Vercel）
-
-1. GitHubにリポジトリをプッシュ
-2. [Vercel](https://vercel.com/)でプロジェクトをインポート
-3. 環境変数を設定
-4. デプロイ完了
-
-⚠️ **注意**: Vercelはサーバーレス環境のため、ファイルシステムへの永続的な書き込みは使用できません。トークン保存にはデータベースまたはKVストレージが必要です。
+- 初音ミクのキャラクター利用ガイドラインに準拠した利用を前提としています
+- Gemini APIの無料枠には利用制限があります
+- X APIの利用には利用規約を遵守してください
 
 ## ライセンス
 
 このプロジェクトは個人利用・学習目的で作成されています。
-

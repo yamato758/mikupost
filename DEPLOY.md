@@ -16,16 +16,9 @@ VercelはNext.jsを作った会社が提供するプラットフォームで、N
 #### 1. GitHubにリポジトリをプッシュ
 
 ```bash
-# Gitリポジトリを初期化（まだの場合）
 git init
-
-# ファイルをステージング
 git add .
-
-# コミット
 git commit -m "Initial commit"
-
-# GitHubにリポジトリを作成し、プッシュ
 git remote add origin https://github.com/your-username/mikupost.git
 git branch -M main
 git push -u origin main
@@ -36,112 +29,84 @@ git push -u origin main
 1. [Vercel](https://vercel.com/)にアクセスしてログイン
 2. 「Add New Project」をクリック
 3. GitHubリポジトリを選択
-4. プロジェクト設定：
-   - **Framework Preset**: Next.js（自動検出される）
-   - **Root Directory**: `./`（デフォルト）
-   - **Build Command**: `npm run build`（自動）
-   - **Output Directory**: `.next`（自動）
+4. プロジェクト設定はデフォルトでOK
 
-#### 3. 環境変数の設定
+#### 3. Vercel KVの設定
 
-Vercelのプロジェクト設定で、以下の環境変数を追加：
+1. Vercelプロジェクトの **Storage** タブを開く
+2. **Create Database** → **KV** を選択
+3. データベースを作成
+4. 環境変数が自動的に設定されます
 
-```
-TWITTER_CLIENT_ID=your_client_id
-TWITTER_CLIENT_SECRET=your_client_secret
-TWITTER_REDIRECT_URI=https://your-app.vercel.app/api/auth/twitter/callback
-NANO_BANANA_API_TOKEN=your_gemini_api_key
-NEXTAUTH_URL=https://your-app.vercel.app
-```
+#### 4. 環境変数の設定
 
-**重要**: `TWITTER_REDIRECT_URI`は、デプロイ後に取得するVercelのURLに変更してください。
+Vercelのプロジェクト設定 → **Environment Variables** で以下を追加：
 
-#### 4. X Developer Portalの設定更新
+| 変数名 | 値 |
+|--------|-----|
+| `TWITTER_CLIENT_ID` | OAuth 2.0 Client ID |
+| `TWITTER_CLIENT_SECRET` | OAuth 2.0 Client Secret |
+| `TWITTER_REDIRECT_URI` | `https://your-app.vercel.app/api/auth/twitter/callback` |
+| `TWITTER_API_KEY` | API Key (Consumer Key) |
+| `TWITTER_API_SECRET` | API Key Secret |
+| `TWITTER_ACCESS_TOKEN` | Access Token (Read and write権限) |
+| `TWITTER_ACCESS_TOKEN_SECRET` | Access Token Secret |
+| `NANO_BANANA_API_TOKEN` | Gemini API Key |
+| `NEXTAUTH_URL` | `https://your-app.vercel.app` |
+
+#### 5. X Developer Portalの設定
 
 1. [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)にアクセス
-2. アプリの設定を開く
-3. 「Callback URI / Redirect URL」に以下を追加：
-   ```
-   https://your-app.vercel.app/api/auth/twitter/callback
-   ```
-4. 保存
+2. アプリの **User authentication settings** を編集：
+   - **App permissions**: Read and write
+   - **Callback URL**: `https://your-app.vercel.app/api/auth/twitter/callback`
+3. **Keys and tokens** で Access Token を再生成（Read and write権限）
 
-#### 5. デプロイ
+#### 6. デプロイ
 
 Vercelは自動的にデプロイを開始します。完了後、提供されたURLでアプリにアクセスできます。
 
-### 注意事項
+---
 
-⚠️ **重要**: Vercelはサーバーレス環境のため、ファイルシステムへの永続的な書き込み（`data/tokens.json`）は使用できません。
+## X API設定の詳細
 
-現在の実装では、トークンは一時的なファイルシステムに保存されますが、これはサーバーレス環境では動作しません。
+### 必要な権限とスコープ
 
-**解決策**:
-- データベース（Vercel Postgres、Supabase、PlanetScaleなど）を使用
-- または、セッションストレージ（Vercel KV、Redisなど）を使用
+**OAuth 2.0（ユーザー認証用）:**
+- `tweet.read`
+- `tweet.write`
+- `users.read`
+- `offline.access`
+- `media.write`
 
-詳細は「トークン保存の改善」セクションを参照してください。
+**OAuth 1.0a（メディアアップロード用）:**
+- App permissions: **Read and write**
+
+### Access Tokenの生成
+
+1. X Developer Portalでアプリを選択
+2. **Settings** → **User authentication settings** → **Edit**
+3. **App permissions** を **Read and write** に設定 → **Save**
+4. **Keys and tokens** タブに戻る
+5. **Access Token and Secret** の **Regenerate** をクリック
+6. 表示されたトークンをVercelの環境変数に設定
+
+⚠️ **重要**: 権限を変更した後は、必ずAccess Tokenを再生成してください。
 
 ---
 
-## その他のデプロイオプション
+## Upstash KV（Vercel KV以外の場合）
 
-### Railway
+Vercel KVの代わりにUpstash KVを使用することもできます。
 
-1. [Railway](https://railway.app/)にアカウント作成
-2. 「New Project」→「Deploy from GitHub repo」
-3. リポジトリを選択
-4. 環境変数を設定
-5. デプロイ
+1. [Upstash](https://upstash.com/)でアカウント作成
+2. Redis データベースを作成
+3. 以下の環境変数を設定：
 
-**メリット**: ファイルシステムへの書き込みが可能
-
-### Render
-
-1. [Render](https://render.com/)にアカウント作成
-2. 「New Web Service」→ GitHubリポジトリを選択
-3. 設定：
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-4. 環境変数を設定
-5. デプロイ
-
-**メリット**: 無料プランあり、ファイルシステムへの書き込みが可能
-
-### Fly.io
-
-1. [Fly.io](https://fly.io/)にアカウント作成
-2. `flyctl`をインストール
-3. `flyctl launch`でデプロイ
-4. 環境変数を設定
-
-**メリット**: グローバルなデプロイ、ファイルシステムへの書き込みが可能
-
----
-
-## トークン保存の改善（Vercel使用時）
-
-Vercelでデプロイする場合、以下のいずれかの方法でトークン保存を改善する必要があります：
-
-### オプション1: Vercel KV（推奨）
-
-```bash
-npm install @vercel/kv
 ```
-
-`lib/token-manager.ts`を更新して、Vercel KVを使用するように変更します。
-
-### オプション2: Supabase
-
-```bash
-npm install @supabase/supabase-js
+UPSTASH_KV_REST_API_URL=https://xxx.upstash.io
+UPSTASH_KV_REST_API_TOKEN=your_token
 ```
-
-Supabaseデータベースにトークンを保存します。
-
-### オプション3: セッションストレージ
-
-Next.jsのセッション機能を使用して、トークンをクライアント側で管理します。
 
 ---
 
@@ -155,11 +120,22 @@ Next.jsのセッション機能を使用して、トークンをクライアン�
 
 ### 認証が動作しない場合
 
-- `TWITTER_REDIRECT_URI`が正しく設定されているか確認
-- X Developer PortalのコールバックURLが正しいか確認
-- 環境変数がVercelに正しく設定されているか確認
+- `TWITTER_REDIRECT_URI`がVercelのURLと一致しているか確認
+- X Developer PortalのCallback URLが正しいか確認
+- すべての環境変数が設定されているか確認
 
-### トークンが保存されない場合
+### 画像がポストされない場合
 
-- Vercel使用時は、ファイルシステムへの書き込みができないため、データベースまたはKVストレージを使用する必要があります
+以下の4つの環境変数がすべて設定されているか確認：
+- `TWITTER_API_KEY`
+- `TWITTER_API_SECRET`
+- `TWITTER_ACCESS_TOKEN`
+- `TWITTER_ACCESS_TOKEN_SECRET`
 
+Access Tokenが **Read and write** 権限で生成されているか確認。
+
+### 「未連携」と表示される場合
+
+- KV（Vercel KV または Upstash KV）が正しく設定されているか確認
+- 環境変数が正しく設定されているか確認
+- X APIのレート制限に達していないか確認（15分待つ）
