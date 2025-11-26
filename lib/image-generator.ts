@@ -5,9 +5,21 @@ import { GEMINI_API_URL, ERROR_MESSAGES } from './constants';
  * 画像生成用のプロンプトを生成
  */
 function buildPrompt(userText: string): string {
-  // Gemini API用にプロンプトを最適化
-  // 画像に文字が含まれないように明示的に指定
-  return `Create an anime-style illustration of Hatsune Miku themed around "${userText}". High quality, detailed, beautiful artwork, best quality, 8k resolution. No text, no letters, no writing, no characters, no words, no signs, no symbols in the image.`;
+  return `Create an ultra cute chibi Hatsune Miku illustration themed around "${userText}".
+
+Character: super deformed chibi style, oversized head, tiny adorable body, big sparkling eyes with star and heart highlights, long flowing twintails with soft gradients, rosy pink cheeks, sweet innocent smile, small cute hands.
+
+Style: kawaii, soft anime, pastel fantasy, fairy kei inspired, cotton candy aesthetic.
+
+Atmosphere: dreamy ethereal glow, soft fluffy clouds, floating pastel bubbles, magical sparkles and glitter, scattered stars and hearts, rainbow light rays, bokeh effect, soft gradient background in pink, lavender and mint colors.
+
+Lighting: soft diffused lighting, gentle glow around character, iridescent highlights.
+
+Quality: masterpiece, best quality, ultra-detailed, 8k resolution, professional illustration, pixiv ranking, trending on artstation.
+
+Mood: pure, innocent, angelic, heartwarming, magical girl vibes.
+
+No text, no letters, no writing, no words, no signs, no symbols in the image.`;
 }
 
 /**
