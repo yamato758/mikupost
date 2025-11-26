@@ -21,33 +21,30 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
   }
 
   try {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
       console.log('Starting media upload, buffer size:', imageBuffer.length);
       console.log('Access token present:', !!tokens.access_token);
     }
     
-    // X APIのメディアアップロードエンドポイント（OAuth 2.0でも使用可能）
-    // Node.js 18以降のネイティブFormDataを使用
-    // BufferをUint8Arrayに変換してからBlobに変換
-    const formData = new FormData();
-    // BufferをUint8Arrayに変換（Blobのコンストラクタで使用可能にするため）
-    const uint8Array = new Uint8Array(imageBuffer);
-    // Node.js環境でBlobが利用可能か確認
-    if (typeof Blob !== 'undefined') {
-      formData.append('media', new Blob([uint8Array], { type: 'image/png' }), 'image.png');
-    } else {
-      // フォールバック: Uint8Arrayを直接使用
-      formData.append('media', uint8Array as any, 'image.png');
+    // X APIのメディアアップロード
+    // OAuth 2.0 User Contextでは、base64エンコードされたデータを
+    // application/x-www-form-urlencoded形式で送信する必要がある
+    const base64Media = imageBuffer.toString('base64');
+    
+    if (process.env.VERCEL) {
+      console.log('Base64 media length:', base64Media.length);
     }
-    formData.append('media_category', 'tweet_image');
 
     const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
-        // FormDataを使用する場合、Content-Typeは自動設定されるため明示的に指定しない
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData,
+      body: new URLSearchParams({
+        media_data: base64Media,
+        media_category: 'tweet_image',
+      }),
     });
 
     if (process.env.NODE_ENV === 'development') {
