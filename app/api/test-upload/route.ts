@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateImage, fetchImageAsBuffer } from '@/lib/image-generator';
-import { loadTokens } from '@/lib/token-manager-kv';
+import { uploadMediaWithOAuth1, isOAuth1Available } from '@/lib/oauth1-upload';
 
 /**
- * メディアアップロードテスト用エンドポイント
+ * メディアアップロードテスト用エンドポイント（OAuth 1.0a）
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const text = searchParams.get('text') || 'テスト';
   
-  // 1. トークン確認
-  const tokens = await loadTokens();
-  if (!tokens || !tokens.access_token) {
+  // 1. OAuth 1.0a認証情報確認
+  const oauth1Available = isOAuth1Available();
+  if (!oauth1Available) {
     return NextResponse.json({
-      step: 'token',
-      error: 'アクセストークンがありません',
+      step: 'oauth1_check',
+      error: 'OAuth 1.0a認証情報がありません',
+      hasApiKey: !!process.env.TWITTER_API_KEY,
+      hasApiSecret: !!process.env.TWITTER_API_SECRET,
+      hasAccessToken: !!process.env.TWITTER_ACCESS_TOKEN,
+      hasAccessTokenSecret: !!process.env.TWITTER_ACCESS_TOKEN_SECRET,
     });
   }
   
@@ -38,53 +42,31 @@ export async function GET(request: NextRequest) {
     });
   }
   
-  // 4. メディアアップロード（base64形式）
-  console.log('Uploading media, buffer size:', imageBuffer.length);
+  // 4. OAuth 1.0aでメディアアップロード
+  console.log('Uploading media with OAuth 1.0a, buffer size:', imageBuffer.length);
   
   try {
-    // base64エンコード
-    const base64Media = imageBuffer.toString('base64');
-    console.log('Base64 length:', base64Media.length);
-
-    const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        media_data: base64Media,
-        media_category: 'tweet_image',
-      }),
-    });
-
-    const responseText = await uploadResponse.text();
-    let responseJson = null;
-    try {
-      responseJson = JSON.parse(responseText);
-    } catch {
-      // JSON解析失敗
+    const mediaId = await uploadMediaWithOAuth1(imageBuffer);
+    
+    if (mediaId) {
+      return NextResponse.json({
+        step: 'media_upload',
+        success: true,
+        mediaId,
+        bufferSize: imageBuffer.length,
+      });
+    } else {
+      return NextResponse.json({
+        step: 'media_upload',
+        success: false,
+        error: 'メディアアップロードに失敗しました',
+        bufferSize: imageBuffer.length,
+      });
     }
-
-    // レスポンスヘッダーも取得
-    const responseHeaders: Record<string, string> = {};
-    uploadResponse.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
-    return NextResponse.json({
-      step: 'media_upload',
-      bufferSize: imageBuffer.length,
-      base64Length: base64Media.length,
-      uploadStatus: uploadResponse.status,
-      uploadOk: uploadResponse.ok,
-      responseHeaders,
-      responseText: responseText.substring(0, 1000),
-      responseJson,
-    });
   } catch (error) {
     return NextResponse.json({
       step: 'media_upload',
+      success: false,
       error: String(error),
     });
   }
