@@ -25,8 +25,15 @@ const token = {
 /**
  * OAuth 1.0aでメディアをアップロード
  */
-export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<string | null> {
+export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ mediaId: string | null; error?: string; status?: number; details?: string }> {
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
+  
+  // 認証情報の確認
+  console.log('OAuth1 upload - credentials check:');
+  console.log('  API Key:', process.env.TWITTER_API_KEY ? `${process.env.TWITTER_API_KEY.substring(0, 5)}...` : 'MISSING');
+  console.log('  API Secret:', process.env.TWITTER_API_SECRET ? 'SET' : 'MISSING');
+  console.log('  Access Token:', process.env.TWITTER_ACCESS_TOKEN ? `${process.env.TWITTER_ACCESS_TOKEN.substring(0, 10)}...` : 'MISSING');
+  console.log('  Access Token Secret:', process.env.TWITTER_ACCESS_TOKEN_SECRET ? 'SET' : 'MISSING');
   
   // base64エンコード
   const mediaData = imageBuffer.toString('base64');
@@ -34,7 +41,7 @@ export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<string
   // OAuth署名を生成
   const requestData = {
     url,
-    method: 'POST',
+    method: 'POST' as const,
   };
   
   const authHeader = oauth.toHeader(oauth.authorize(requestData, token));
@@ -42,6 +49,7 @@ export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<string
   console.log('OAuth1 upload - starting upload...');
   console.log('OAuth1 upload - buffer size:', imageBuffer.length);
   console.log('OAuth1 upload - base64 length:', mediaData.length);
+  console.log('OAuth1 upload - auth header:', JSON.stringify(authHeader).substring(0, 100) + '...');
   
   try {
     const response = await fetch(url, {
@@ -57,19 +65,28 @@ export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<string
     
     console.log('OAuth1 upload - response status:', response.status);
     
+    const responseText = await response.text();
+    console.log('OAuth1 upload - response body:', responseText.substring(0, 500));
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OAuth1 upload - error:', errorText);
-      return null;
+      return {
+        mediaId: null,
+        error: 'Upload failed',
+        status: response.status,
+        details: responseText,
+      };
     }
     
-    const result = await response.json();
+    const result = JSON.parse(responseText);
     console.log('OAuth1 upload - success, media_id:', result.media_id_string);
     
-    return result.media_id_string;
+    return { mediaId: result.media_id_string };
   } catch (error) {
     console.error('OAuth1 upload - exception:', error);
-    return null;
+    return {
+      mediaId: null,
+      error: String(error),
+    };
   }
 }
 

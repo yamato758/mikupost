@@ -46,20 +46,22 @@ export async function GET(request: NextRequest) {
   console.log('Uploading media with OAuth 1.0a, buffer size:', imageBuffer.length);
   
   try {
-    const mediaId = await uploadMediaWithOAuth1(imageBuffer);
+    const result = await uploadMediaWithOAuth1(imageBuffer);
     
-    if (mediaId) {
+    if (result.mediaId) {
       return NextResponse.json({
         step: 'media_upload',
         success: true,
-        mediaId,
+        mediaId: result.mediaId,
         bufferSize: imageBuffer.length,
       });
     } else {
       return NextResponse.json({
         step: 'media_upload',
         success: false,
-        error: 'メディアアップロードに失敗しました',
+        error: result.error || 'メディアアップロードに失敗しました',
+        status: result.status,
+        details: result.details,
         bufferSize: imageBuffer.length,
       });
     }

@@ -25,15 +25,15 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
 
   try {
     // OAuth 1.0aでメディアをアップロード
-    const mediaId = await uploadMediaWithOAuth1(imageBuffer);
+    const result = await uploadMediaWithOAuth1(imageBuffer);
     
-    if (!mediaId) {
-      console.error('OAuth 1.0a media upload failed');
+    if (!result.mediaId) {
+      console.error('OAuth 1.0a media upload failed:', result.error, result.details);
       return null;
     }
     
-    console.log('Media upload completed, media ID:', mediaId);
-    return mediaId;
+    console.log('Media upload completed, media ID:', result.mediaId);
+    return result.mediaId;
   } catch (error) {
     console.error('Media upload error:', error);
     return null;
