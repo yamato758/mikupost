@@ -1,13 +1,10 @@
 import {
-  TwitterTokens,
-  TwitterMediaUploadResponse,
   TwitterTweetResponse,
   TwitterUserResponse,
-  TwitterApiError,
 } from './types';
 import { loadTokens } from './token-manager-kv';
 import { fetchImageAsBuffer } from './image-generator';
-import { TWITTER_API_BASE, ERROR_MESSAGES, MEDIA_PROCESSING_WAIT_TIME } from './constants';
+import { TWITTER_API_BASE } from './constants';
 import { uploadMediaWithOAuth1, isOAuth1Available } from './oauth1-upload';
 
 /**
@@ -15,24 +12,19 @@ import { uploadMediaWithOAuth1, isOAuth1Available } from './oauth1-upload';
  * OAuth 1.0aを使用（OAuth 2.0ではv1.1メディアアップロードは利用不可）
  */
 async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
-  console.log('uploadMedia called, buffer size:', imageBuffer.length);
-  
-  // OAuth 1.0aが利用可能か確認
   if (!isOAuth1Available()) {
-    console.error('OAuth 1.0a credentials not available. Media upload requires TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET.');
+    console.error('OAuth 1.0a credentials not available');
     return null;
   }
 
   try {
-    // OAuth 1.0aでメディアをアップロード
     const result = await uploadMediaWithOAuth1(imageBuffer);
     
     if (!result.mediaId) {
-      console.error('OAuth 1.0a media upload failed:', result.error, result.details);
+      console.error('Media upload failed:', result.error);
       return null;
     }
     
-    console.log('Media upload completed, media ID:', result.mediaId);
     return result.mediaId;
   } catch (error) {
     console.error('Media upload error:', error);
@@ -54,23 +46,9 @@ export async function createTweet(text: string, imageUrl?: string): Promise<{ tw
 
     // 画像が提供されている場合のみアップロード
     if (imageUrl) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Image URL provided, attempting to upload media');
-      }
-      // 画像をダウンロードしてバッファに変換
       const imageBuffer = await fetchImageAsBuffer(imageUrl);
-      if (!imageBuffer) {
-        console.warn('画像のダウンロードに失敗しました。画像なしでツイートを試みます。');
-      } else {
-        // メディアをアップロード
+      if (imageBuffer) {
         mediaId = await uploadMedia(imageBuffer);
-        if (!mediaId) {
-          console.warn('画像のアップロードに失敗しました。画像なしでツイートを試みます。');
-        }
-      }
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('No image URL provided, creating text-only tweet');
       }
     }
 

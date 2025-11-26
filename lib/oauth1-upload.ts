@@ -30,16 +30,6 @@ function getTwitterClient(): TwitterApi | null {
  * OAuth 1.0aでメディアをアップロード
  */
 export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ mediaId: string | null; error?: string; status?: number; details?: string }> {
-  console.log('OAuth1 upload - starting...');
-  console.log('OAuth1 upload - buffer size:', imageBuffer.length);
-  
-  // 認証情報の確認
-  console.log('OAuth1 upload - credentials check:');
-  console.log('  API Key:', process.env.TWITTER_API_KEY ? `${process.env.TWITTER_API_KEY.substring(0, 5)}...` : 'MISSING');
-  console.log('  API Secret:', process.env.TWITTER_API_SECRET ? 'SET' : 'MISSING');
-  console.log('  Access Token:', process.env.TWITTER_ACCESS_TOKEN ? `${process.env.TWITTER_ACCESS_TOKEN.substring(0, 15)}...` : 'MISSING');
-  console.log('  Access Token Secret:', process.env.TWITTER_ACCESS_TOKEN_SECRET ? 'SET' : 'MISSING');
-  
   const client = getTwitterClient();
   if (!client) {
     return {
@@ -49,18 +39,14 @@ export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ medi
   }
   
   try {
-    // twitter-api-v2のuploadMediaメソッドを使用
     const mediaId = await client.v1.uploadMedia(imageBuffer, {
       mimeType: 'image/png',
     });
     
-    console.log('OAuth1 upload - success, media_id:', mediaId);
-    
     return { mediaId };
   } catch (error: any) {
-    console.error('OAuth1 upload - error:', error);
+    console.error('Media upload error:', error.message || error);
     
-    // エラーの詳細を取得
     let details = '';
     if (error.data) {
       details = JSON.stringify(error.data);
