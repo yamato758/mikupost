@@ -67,18 +67,24 @@ export async function saveSession(sessionId: string, codeVerifier: string): Prom
     }
 
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
-    // Upstash KV REST API: TTLはクエリパラメータまたはJSONボディで指定
+    // Upstash Redis REST API: SET key value EX ttl
+    // 形式: POST /set/key/value/ex/ttl または POST / with body ["SET", "key", "value", "EX", ttl]
     const response = await fetch(
-      `${kvUrl}/set/${sessionKey}?ex=${SESSION_TTL}`,
+      `${kvUrl}/set/${encodeURIComponent(sessionKey)}/${encodeURIComponent(codeVerifier)}/ex/${SESSION_TTL}`,
       {
-        method: 'POST',
+        method: 'GET', // Upstash REST APIはGETでコマンドを実行
         headers: {
           'Authorization': `Bearer ${kvToken}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(codeVerifier),
       }
     );
+    
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+      console.log('KV SET response:', {
+        status: response.status,
+        ok: response.ok,
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -109,14 +115,23 @@ export async function getSession(sessionId: string): Promise<string | null> {
     }
 
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
+    // Upstash Redis REST API: GET key
     const response = await fetch(
-      `${kvUrl}/get/${sessionKey}`,
+      `${kvUrl}/get/${encodeURIComponent(sessionKey)}`,
       {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${kvToken}`,
         },
       }
     );
+    
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+      console.log('KV GET response:', {
+        status: response.status,
+        ok: response.ok,
+      });
+    }
 
     if (!response.ok) {
       console.error('Failed to load session from KV:', response.statusText);
@@ -151,10 +166,11 @@ export async function deleteSession(sessionId: string): Promise<void> {
     }
 
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
+    // Upstash Redis REST API: DEL key
     const response = await fetch(
-      `${kvUrl}/del/${sessionKey}`,
+      `${kvUrl}/del/${encodeURIComponent(sessionKey)}`,
       {
-        method: 'POST',
+        method: 'GET', // Upstash REST APIはGETでコマンドを実行
         headers: {
           'Authorization': `Bearer ${kvToken}`,
         },
@@ -168,4 +184,3 @@ export async function deleteSession(sessionId: string): Promise<void> {
     console.error('Failed to delete session:', error);
   }
 }
-
