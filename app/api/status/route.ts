@@ -38,8 +38,11 @@ export async function GET(): Promise<NextResponse<TwitterStatusResponse>> {
       });
       
       if (!userInfo) {
+        // userInfoがnullでも、トークンが有効なら連携済みとして扱う
+        // （レート制限などで一時的に取得できない場合のため）
         return NextResponse.json({
-          connected: false,
+          connected: true,
+          username: undefined,
         });
       }
 
@@ -48,10 +51,12 @@ export async function GET(): Promise<NextResponse<TwitterStatusResponse>> {
         username: userInfo.username,
       });
     } catch (error) {
-      // getMe()でエラーが発生した場合も未連携として扱う
-      console.error('Failed to get user info:', error);
+      // getMe()でエラーが発生しても、トークンが有効なら連携済みとして扱う
+      // （レート制限 429 エラーなどの一時的なエラーのため）
+      console.error('Failed to get user info (but tokens are valid):', error);
       return NextResponse.json({
-        connected: false,
+        connected: true,
+        username: undefined,
       });
     }
   } catch (error) {
