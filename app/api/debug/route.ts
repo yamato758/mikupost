@@ -36,8 +36,6 @@ export async function GET(request: NextRequest) {
       });
     }
   }
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN;
   
   // トークンが保存されているか確認
   let tokenStatus = 'unknown';
