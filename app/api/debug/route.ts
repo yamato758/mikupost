@@ -155,6 +155,8 @@ export async function GET(request: NextRequest) {
     },
     // loadTokens関数のテスト
     loadTokensTest: await testLoadTokens(),
+    // getMe関数のテスト
+    getMeTest: await testGetMe(),
   });
 }
 
@@ -168,6 +170,49 @@ async function testLoadTokens() {
       hasTokens: !!tokens,
       hasAccessToken: !!tokens?.access_token,
       isValid: isTokenValid(tokens),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: String(error),
+    };
+  }
+}
+
+// getMe関数をテスト
+async function testGetMe() {
+  try {
+    const { loadTokens } = await import('@/lib/token-manager-kv');
+    const tokens = await loadTokens();
+    
+    if (!tokens || !tokens.access_token) {
+      return {
+        success: false,
+        error: 'No access token',
+      };
+    }
+    
+    // X APIを直接呼び出し
+    const response = await fetch('https://api.twitter.com/2/users/me', {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+      },
+    });
+    
+    const responseText = await response.text();
+    let responseJson = null;
+    try {
+      responseJson = JSON.parse(responseText);
+    } catch {
+      // JSON解析失敗
+    }
+    
+    return {
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      responseJson,
+      responseText: responseText.substring(0, 300),
     };
   } catch (error) {
     return {
