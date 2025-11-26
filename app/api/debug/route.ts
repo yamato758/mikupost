@@ -157,6 +157,15 @@ export async function GET(request: NextRequest) {
     loadTokensTest: await testLoadTokens(),
     // getMe関数のテスト
     getMeTest: await testGetMe(),
+    // OAuth 1.0a認証情報
+    oauth1: {
+      hasApiKey: !!process.env.TWITTER_API_KEY,
+      hasApiSecret: !!process.env.TWITTER_API_SECRET,
+      hasAccessToken: !!process.env.TWITTER_ACCESS_TOKEN,
+      hasAccessTokenSecret: !!process.env.TWITTER_ACCESS_TOKEN_SECRET,
+      apiKeyPrefix: process.env.TWITTER_API_KEY?.substring(0, 5) || 'N/A',
+      accessTokenPrefix: process.env.TWITTER_ACCESS_TOKEN?.substring(0, 15) || 'N/A',
+    },
   });
 }
 
