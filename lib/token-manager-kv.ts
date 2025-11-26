@@ -74,15 +74,22 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
       return null;
     }
 
-    // フォールバック: ファイルシステム（開発環境用）
-    // 注意: Vercelの本番環境では動作しません
-    const fs = await import('fs');
-    const path = await import('path');
-    const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
-    
-    if (fs.existsSync(TOKENS_FILE_PATH)) {
-      const fileContent = fs.readFileSync(TOKENS_FILE_PATH, 'utf-8');
-      return JSON.parse(fileContent) as TwitterTokens;
+    // フォールバック: ファイルシステム（開発環境用のみ）
+    // 注意: Vercelの本番環境ではファイルシステムへの書き込みはできません
+    // KVが利用できない場合はエラーを返す（開発環境でもKVの使用を推奨）
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
+        
+        if (fs.existsSync(TOKENS_FILE_PATH)) {
+          const fileContent = fs.readFileSync(TOKENS_FILE_PATH, 'utf-8');
+          return JSON.parse(fileContent) as TwitterTokens;
+        }
+      } catch (fsError) {
+        console.warn('File system fallback failed:', fsError);
+      }
     }
     
     return null;
@@ -127,17 +134,30 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
       return;
     }
 
-    // フォールバック: ファイルシステム（開発環境用）
-    const fs = await import('fs');
-    const path = await import('path');
-    const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
-    const dataDir = path.dirname(TOKENS_FILE_PATH);
-    
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    // フォールバック: ファイルシステム（開発環境用のみ）
+    // 注意: Vercelの本番環境ではファイルシステムへの書き込みはできません
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
+        const dataDir = path.dirname(TOKENS_FILE_PATH);
+        
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        
+        fs.writeFileSync(TOKENS_FILE_PATH, JSON.stringify(tokens, null, 2), 'utf-8');
+        return;
+      } catch (fsError) {
+        console.warn('File system fallback failed:', fsError);
+        // フォールバックが失敗した場合はエラーをスロー
+        throw new Error('KVが利用できず、ファイルシステムへの書き込みも失敗しました。KVの設定を確認してください。');
+      }
     }
     
-    fs.writeFileSync(TOKENS_FILE_PATH, JSON.stringify(tokens, null, 2), 'utf-8');
+    // 本番環境でKVが利用できない場合はエラー
+    throw new Error('KVが利用できません。Vercel KVまたはUpstash KVの設定を確認してください。');
   } catch (error) {
     console.error(ERROR_MESSAGES.TOKEN_SAVE_FAILED, error);
     throw new Error(ERROR_MESSAGES.TOKEN_SAVE_FAILED);
@@ -175,13 +195,20 @@ export async function deleteTokens(): Promise<void> {
       return;
     }
 
-    // フォールバック: ファイルシステム（開発環境用）
-    const fs = await import('fs');
-    const path = await import('path');
-    const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
-    
-    if (fs.existsSync(TOKENS_FILE_PATH)) {
-      fs.unlinkSync(TOKENS_FILE_PATH);
+    // フォールバック: ファイルシステム（開発環境用のみ）
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
+        
+        if (fs.existsSync(TOKENS_FILE_PATH)) {
+          fs.unlinkSync(TOKENS_FILE_PATH);
+        }
+        return;
+      } catch (fsError) {
+        console.warn('File system fallback failed:', fsError);
+      }
     }
   } catch (error) {
     console.error(ERROR_MESSAGES.TOKEN_DELETE_FAILED, error);

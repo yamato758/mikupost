@@ -3,6 +3,7 @@ import { saveTokens } from '@/lib/token-manager-kv';
 import { TwitterTokens, TwitterTokenResponse } from '@/lib/types';
 import { TWITTER_API_BASE, ERROR_MESSAGES, OAUTH_STATE } from '@/lib/constants';
 import { validateEnvVars } from '@/lib/utils';
+import { getSession, deleteSession } from '@/lib/session-manager';
 import { cookies } from 'next/headers';
 
 /**
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
   const error = searchParams.get('error');
+  const state = searchParams.get('state');
 
   // ベースURLを正しく構築
   const getBaseUrl = () => {
@@ -49,28 +51,49 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
   const redirectUri = process.env.TWITTER_REDIRECT_URI!;
 
-  // Cookieからcode_verifierを取得
-  const cookieStore = await cookies();
-  const codeVerifierCookie = cookieStore.get('oauth_code_verifier');
-  const codeVerifier = codeVerifierCookie?.value;
+  // stateパラメータからセッションIDを取得
+  let sessionId: string | null = null;
+  if (state && state.startsWith(`${OAUTH_STATE}:`)) {
+    sessionId = state.split(':')[1];
+  }
 
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('Cookie check:', {
-      cookieExists: !!codeVerifierCookie,
-      hasValue: !!codeVerifier,
-      cookieName: codeVerifierCookie?.name,
+  // KVからcode_verifierを取得（優先）
+  let codeVerifier: string | null = null;
+  if (sessionId) {
+    codeVerifier = await getSession(sessionId);
+    if (codeVerifier) {
+      // 使用済みのセッションを削除
+      await deleteSession(sessionId);
+    }
+  }
+
+  // フォールバック: Cookieから取得（開発環境用）
+  if (!codeVerifier) {
+    const cookieStore = await cookies();
+    const codeVerifierCookie = cookieStore.get('oauth_code_verifier');
+    codeVerifier = codeVerifierCookie?.value || null;
+    
+    if (codeVerifier) {
+      // 使用済みのCookieを削除
+      cookieStore.delete('oauth_code_verifier');
+    }
+  }
+
+  // デバッグ用
+  if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+    console.log('Session check:', {
+      hasState: !!state,
+      sessionId,
+      hasCodeVerifier: !!codeVerifier,
       requestUrl: request.url,
-      requestHeaders: Object.fromEntries(request.headers.entries()),
     });
   }
 
   if (!codeVerifier) {
-    console.error('code_verifier not found in cookies', {
-      cookieExists: !!codeVerifierCookie,
-      allCookies: cookieStore.getAll().map(c => c.name),
+    console.error('code_verifier not found', {
+      hasState: !!state,
+      sessionId,
       requestUrl: request.url,
-      origin: request.headers.get('origin'),
-      host: request.headers.get('host'),
     });
     
     const errorUrl = new URL('/', baseUrl);
@@ -94,9 +117,6 @@ export async function GET(request: NextRequest) {
         code_verifier: codeVerifier,
       }),
     });
-
-    // 使用済みのcode_verifierをCookieから削除
-    cookieStore.delete('oauth_code_verifier');
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();

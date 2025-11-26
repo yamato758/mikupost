@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TWITTER_AUTH_BASE, TWITTER_OAUTH_SCOPES, OAUTH_STATE, ERROR_MESSAGES } from '@/lib/constants';
 import { validateEnvVars } from '@/lib/utils';
 import { generatePKCEParams } from '@/lib/oauth-pkce';
+import { generateSessionId, saveSession } from '@/lib/session-manager';
 import { cookies } from 'next/headers';
 
 /**
@@ -23,17 +24,34 @@ export async function GET(request: NextRequest) {
   // PKCEパラメータを生成
   const { verifier, challenge } = generatePKCEParams();
   
-  // code_verifierをCookieに保存（コールバックで使用するため）
-  const cookieStore = await cookies();
-  // Vercel環境では常にHTTPSなので、secure: trueとsameSite: 'none'を使用
-  const isProduction: boolean = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-  cookieStore.set('oauth_code_verifier', verifier, {
-    httpOnly: true,
-    secure: isProduction, // Vercelでは常にHTTPS
-    sameSite: isProduction ? 'none' : 'lax', // 外部リダイレクト対応のため
-    maxAge: 600, // 10分
-    path: '/',
-  });
+  // セッションIDを生成
+  const sessionId = generateSessionId();
+  
+  // code_verifierをKVに保存（Cookieに依存しない方法）
+  try {
+    await saveSession(sessionId, verifier);
+  } catch (error) {
+    console.error('Failed to save session:', error);
+    // フォールバック: Cookieにも保存（開発環境用）
+    const cookieStore = await cookies();
+    const isProduction: boolean = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    cookieStore.set('oauth_code_verifier', verifier, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      maxAge: 600,
+      path: '/',
+    });
+  }
+  
+  // デバッグ用
+  if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
+    console.log('Session created:', {
+      sessionId,
+      hasVerifier: !!verifier,
+      verifierLength: verifier.length,
+    });
+  }
   
   if (process.env.NODE_ENV === 'development') {
     console.debug('OAuth code_verifier saved to cookie');
@@ -45,9 +63,21 @@ export async function GET(request: NextRequest) {
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('scope', TWITTER_OAUTH_SCOPES.join(' '));
-  authUrl.searchParams.set('state', OAUTH_STATE); // CSRF対策用（本番環境ではランダム値推奨）
+  // stateパラメータにセッションIDを含める（CSRF対策 + セッション識別）
+  authUrl.searchParams.set('state', `${OAUTH_STATE}:${sessionId}`);
   authUrl.searchParams.set('code_challenge', challenge);
   authUrl.searchParams.set('code_challenge_method', 'S256'); // SHA256を使用
+
+  // デバッグログ（開発環境のみ）
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('OAuth authorization URL:', {
+      url: authUrl.toString(),
+      clientId: clientId.substring(0, 10) + '...',
+      redirectUri,
+      scopes: TWITTER_OAUTH_SCOPES,
+      hasCodeChallenge: !!challenge,
+    });
+  }
 
   return NextResponse.redirect(authUrl.toString());
 }

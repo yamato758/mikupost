@@ -1,3 +1,11 @@
+/**
+ * 注意: このファイルは未使用です。
+ * Vercel環境では `token-manager-kv.ts` を使用してください。
+ * このファイルは開発環境でのみ使用可能ですが、現在は使用されていません。
+ * 
+ * @deprecated このファイルは非推奨です。`token-manager-kv.ts` を使用してください。
+ */
+
 import { TwitterTokens } from './types';
 import fs from 'fs';
 import path from 'path';

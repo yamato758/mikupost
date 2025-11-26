@@ -10,9 +10,9 @@ import { fetchImageAsBuffer } from './image-generator';
 import { TWITTER_API_BASE, ERROR_MESSAGES, MEDIA_PROCESSING_WAIT_TIME } from './constants';
 
 /**
- * X API v2でメディアをアップロード
+ * X APIでメディアをアップロード
  * OAuth 2.0のBearerトークンを使用
- * v2ではmultipart/form-data形式で単一リクエストでアップロード
+ * multipart/form-data形式で単一リクエストでアップロード
  */
 async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
   const tokens = await loadTokens();
@@ -26,16 +26,20 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
       console.log('Access token present:', !!tokens.access_token);
     }
     
-    // v2 APIではmultipart/form-data形式で単一リクエストでアップロード
-    // Node.js 18以降のネイティブFormDataとBlobを使用
+    // X APIのメディアアップロードエンドポイント（OAuth 2.0でも使用可能）
+    // Node.js 18以降のネイティブFormDataを使用
+    // BufferをBlobに変換してFormDataに追加
     const formData = new FormData();
-    // Blobとして画像データを追加（BufferをUint8Arrayに変換）
-    const uint8Array = new Uint8Array(imageBuffer);
-    const blob = new Blob([uint8Array], { type: 'image/png' });
-    formData.append('media', blob, 'image.png');
+    // Node.js環境でBlobが利用可能か確認
+    if (typeof Blob !== 'undefined') {
+      formData.append('media', new Blob([imageBuffer], { type: 'image/png' }), 'image.png');
+    } else {
+      // フォールバック: Bufferを直接使用（Node.js 18+では動作するはず）
+      formData.append('media', imageBuffer as any, 'image.png');
+    }
     formData.append('media_category', 'tweet_image');
 
-    const uploadResponse = await fetch('https://api.twitter.com/2/media/upload', {
+    const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
@@ -83,7 +87,7 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
       console.log('Media upload response:', JSON.stringify(uploadData, null, 2));
     }
     
-    // v2 APIのレスポンス形式に対応
+    // X API v1.1のレスポンス形式に対応（media_id_stringが標準）
     const mediaId =
       uploadData.media_id_string ||
       uploadData.data?.media_id ||
