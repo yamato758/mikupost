@@ -4,23 +4,27 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 
-// OAuth 1.0a設定
-const oauth = new OAuth({
-  consumer: {
-    key: process.env.TWITTER_API_KEY || '',
-    secret: process.env.TWITTER_API_SECRET || '',
-  },
-  signature_method: 'HMAC-SHA1',
-  hash_function(base_string: string, key: string) {
-    return crypto.createHmac('sha1', key).update(base_string).digest('base64');
-  },
-});
+// OAuth 1.0a設定を関数で取得（環境変数が確実に読み込まれるように）
+function getOAuthClient() {
+  return new OAuth({
+    consumer: {
+      key: process.env.TWITTER_API_KEY || '',
+      secret: process.env.TWITTER_API_SECRET || '',
+    },
+    signature_method: 'HMAC-SHA1',
+    hash_function(base_string: string, key: string) {
+      return crypto.createHmac('sha1', key).update(base_string).digest('base64');
+    },
+  });
+}
 
-// アクセストークン
-const token = {
-  key: process.env.TWITTER_ACCESS_TOKEN || '',
-  secret: process.env.TWITTER_ACCESS_TOKEN_SECRET || '',
-};
+// アクセストークンを関数で取得
+function getToken() {
+  return {
+    key: process.env.TWITTER_ACCESS_TOKEN || '',
+    secret: process.env.TWITTER_ACCESS_TOKEN_SECRET || '',
+  };
+}
 
 /**
  * OAuth 1.0aでメディアをアップロード
@@ -28,34 +32,39 @@ const token = {
 export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ mediaId: string | null; error?: string; status?: number; details?: string }> {
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
   
+  // 認証情報を動的に取得
+  const oauth = getOAuthClient();
+  const token = getToken();
+  
   // 認証情報の確認
   console.log('OAuth1 upload - credentials check:');
-  console.log('  API Key:', process.env.TWITTER_API_KEY ? `${process.env.TWITTER_API_KEY.substring(0, 5)}...` : 'MISSING');
+  console.log('  API Key:', token.key ? `${process.env.TWITTER_API_KEY?.substring(0, 5)}...` : 'MISSING');
   console.log('  API Secret:', process.env.TWITTER_API_SECRET ? 'SET' : 'MISSING');
-  console.log('  Access Token:', process.env.TWITTER_ACCESS_TOKEN ? `${process.env.TWITTER_ACCESS_TOKEN.substring(0, 10)}...` : 'MISSING');
-  console.log('  Access Token Secret:', process.env.TWITTER_ACCESS_TOKEN_SECRET ? 'SET' : 'MISSING');
+  console.log('  Access Token:', token.key ? `${token.key.substring(0, 15)}...` : 'MISSING');
+  console.log('  Access Token Secret:', token.secret ? 'SET' : 'MISSING');
   
   // base64エンコード
   const mediaData = imageBuffer.toString('base64');
   
-  // OAuth署名を生成
+  // OAuth署名を生成（メディアアップロードではbodyパラメータは署名に含めない）
   const requestData = {
     url,
     method: 'POST' as const,
   };
   
-  const authHeader = oauth.toHeader(oauth.authorize(requestData, token));
+  const authorization = oauth.authorize(requestData, token);
+  const authHeader = oauth.toHeader(authorization);
   
   console.log('OAuth1 upload - starting upload...');
   console.log('OAuth1 upload - buffer size:', imageBuffer.length);
   console.log('OAuth1 upload - base64 length:', mediaData.length);
-  console.log('OAuth1 upload - auth header:', JSON.stringify(authHeader).substring(0, 100) + '...');
+  console.log('OAuth1 upload - oauth_token in header:', authorization.oauth_token?.substring(0, 15) + '...');
   
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        ...authHeader,
+        'Authorization': authHeader.Authorization,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
