@@ -53,9 +53,11 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
         return null;
       }
 
+      // Upstash REST API: GET /get/key
       const response = await fetch(
-        `${kvUrl}/get/${TOKEN_KEY}`,
+        `${kvUrl}/get/${encodeURIComponent(TOKEN_KEY)}`,
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${kvToken}`,
           },
@@ -68,6 +70,10 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
       }
 
       const data = await response.json();
+      if (process.env.VERCEL) {
+        console.log('loadTokens response:', { hasResult: !!data.result });
+      }
+      
       if (data.result) {
         return JSON.parse(data.result) as TwitterTokens;
       }
@@ -113,19 +119,21 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
         throw new Error('KV credentials are incomplete');
       }
 
+      // Upstash REST API: GET /set/key/value
+      const tokenJson = JSON.stringify(tokens);
       const response = await fetch(
-        `${kvUrl}/set/${TOKEN_KEY}`,
+        `${kvUrl}/set/${encodeURIComponent(TOKEN_KEY)}/${encodeURIComponent(tokenJson)}`,
         {
-          method: 'POST',
+          method: 'GET', // Upstash REST APIはGETでコマンドを実行
           headers: {
             'Authorization': `Bearer ${kvToken}`,
-            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            value: JSON.stringify(tokens),
-          }),
         }
       );
+
+      if (process.env.VERCEL) {
+        console.log('saveTokens response:', { status: response.status, ok: response.ok });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -179,10 +187,11 @@ export async function deleteTokens(): Promise<void> {
         return;
       }
 
+      // Upstash REST API: GET /del/key
       const response = await fetch(
-        `${kvUrl}/del/${TOKEN_KEY}`,
+        `${kvUrl}/del/${encodeURIComponent(TOKEN_KEY)}`,
         {
-          method: 'POST',
+          method: 'GET', // Upstash REST APIはGETでコマンドを実行
           headers: {
             'Authorization': `Bearer ${kvToken}`,
           },
