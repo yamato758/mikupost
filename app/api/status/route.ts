@@ -14,7 +14,15 @@ export async function GET(): Promise<NextResponse<TwitterStatusResponse>> {
   try {
     const tokens = await loadTokens();
     
+    // デバッグログ
+    console.log('Status check - tokens loaded:', {
+      hasTokens: !!tokens,
+      hasAccessToken: !!tokens?.access_token,
+      tokenType: tokens?.token_type,
+    });
+    
     if (!isTokenValid(tokens)) {
+      console.log('Status check - tokens invalid');
       return NextResponse.json({
         connected: false,
       });
@@ -23,6 +31,11 @@ export async function GET(): Promise<NextResponse<TwitterStatusResponse>> {
     // 実際にAPIを呼び出して認証状態を確認
     try {
       const userInfo = await getMe();
+      
+      console.log('Status check - getMe result:', {
+        hasUserInfo: !!userInfo,
+        username: userInfo?.username,
+      });
       
       if (!userInfo) {
         return NextResponse.json({

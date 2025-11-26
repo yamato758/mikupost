@@ -153,6 +153,27 @@ export async function GET(request: NextRequest) {
       status: tokenStatus,
       data: tokenData,
     },
+    // loadTokens関数のテスト
+    loadTokensTest: await testLoadTokens(),
   });
+}
+
+// loadTokens関数をテスト
+async function testLoadTokens() {
+  try {
+    const { loadTokens, isTokenValid } = await import('@/lib/token-manager-kv');
+    const tokens = await loadTokens();
+    return {
+      success: true,
+      hasTokens: !!tokens,
+      hasAccessToken: !!tokens?.access_token,
+      isValid: isTokenValid(tokens),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: String(error),
+    };
+  }
 }
 
