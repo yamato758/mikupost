@@ -44,12 +44,13 @@ export async function GET(request: NextRequest) {
   if (kvUrl && kvToken) {
     try {
       const tokenResponse = await fetch(
-        `${kvUrl}/get/twitter_tokens`,
+        `${kvUrl}/get/${encodeURIComponent('twitter_tokens')}`,
         {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${kvToken}`,
           },
+          cache: 'no-store', // キャッシュを無効化
         }
       );
       

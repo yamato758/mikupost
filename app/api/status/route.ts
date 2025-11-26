@@ -3,6 +3,10 @@ import { loadTokens, isTokenValid } from '@/lib/token-manager-kv';
 import { getMe } from '@/lib/twitter-client';
 import { TwitterStatusResponse } from '@/lib/types';
 
+// キャッシュを無効化
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * X連携状態確認エンドポイント
  */
