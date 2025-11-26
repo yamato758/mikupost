@@ -28,14 +28,16 @@ async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
     
     // X APIのメディアアップロードエンドポイント（OAuth 2.0でも使用可能）
     // Node.js 18以降のネイティブFormDataを使用
-    // BufferをBlobに変換してFormDataに追加
+    // BufferをUint8Arrayに変換してからBlobに変換
     const formData = new FormData();
+    // BufferをUint8Arrayに変換（Blobのコンストラクタで使用可能にするため）
+    const uint8Array = new Uint8Array(imageBuffer);
     // Node.js環境でBlobが利用可能か確認
     if (typeof Blob !== 'undefined') {
-      formData.append('media', new Blob([imageBuffer], { type: 'image/png' }), 'image.png');
+      formData.append('media', new Blob([uint8Array], { type: 'image/png' }), 'image.png');
     } else {
-      // フォールバック: Bufferを直接使用（Node.js 18+では動作するはず）
-      formData.append('media', imageBuffer as any, 'image.png');
+      // フォールバック: Uint8Arrayを直接使用
+      formData.append('media', uint8Array as any, 'image.png');
     }
     formData.append('media_category', 'tweet_image');
 
