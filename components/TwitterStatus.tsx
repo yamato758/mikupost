@@ -34,22 +34,21 @@ export default function TwitterStatus({ status, onStatusChange }: TwitterStatusP
       } else {
         alert('連携解除に失敗しました: ' + (data.error || '不明なエラー'));
       }
-    } catch (error) {
-      console.error('Failed to disconnect:', error);
-      alert('連携解除中にエラーが発生しました');
+    } catch (error: any) {
+      alert(`連携解除中にエラーが発生しました: ${error.message || '不明なエラー'}`);
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white/30 backdrop-blur-sm rounded-lg p-4 shadow-lg">
+      <div className="bg-white/50 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/50">
         <div className="animate-pulse text-gray-600">読み込み中...</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white/30 backdrop-blur-sm rounded-lg p-4 shadow-lg">
+    <div className="bg-white/50 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/50">
       {status?.connected ? (
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -70,7 +69,7 @@ export default function TwitterStatus({ status, onStatusChange }: TwitterStatusP
           </div>
           <button
             onClick={handleDisconnect}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md text-sm"
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg text-sm font-medium"
           >
             連携解除
           </button>
@@ -93,7 +92,7 @@ export default function TwitterStatus({ status, onStatusChange }: TwitterStatusP
           </div>
           <button
             onClick={handleConnect}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
           >
             連携する
           </button>

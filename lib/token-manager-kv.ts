@@ -49,7 +49,6 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
       const kvToken = getKvRestApiToken();
       
       if (!kvUrl || !kvToken) {
-        console.error('KV credentials are incomplete');
         return null;
       }
 
@@ -65,14 +64,10 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
       );
 
       if (!response.ok) {
-        console.error('Failed to load tokens from KV:', response.statusText);
         return null;
       }
 
       const data = await response.json();
-      if (process.env.VERCEL) {
-        console.log('loadTokens response:', { hasResult: !!data.result });
-      }
       
       if (data.result) {
         return JSON.parse(data.result) as TwitterTokens;
@@ -100,7 +95,6 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
     
     return null;
   } catch (error) {
-    console.error(ERROR_MESSAGES.TOKEN_LOAD_FAILED, error);
     return null;
   }
 }
@@ -130,10 +124,6 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
           },
         }
       );
-
-      if (process.env.VERCEL) {
-        console.log('saveTokens response:', { status: response.status, ok: response.ok });
-      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -198,9 +188,7 @@ export async function deleteTokens(): Promise<void> {
         }
       );
 
-      if (!response.ok) {
-        console.error('Failed to delete tokens from KV:', response.statusText);
-      }
+      // 削除の失敗は無視（既に存在しない可能性があるため）
       return;
     }
 
@@ -216,11 +204,11 @@ export async function deleteTokens(): Promise<void> {
         }
         return;
       } catch (fsError) {
-        console.warn('File system fallback failed:', fsError);
+        // ファイルシステムフォールバックが失敗した場合は無視
       }
     }
   } catch (error) {
-    console.error(ERROR_MESSAGES.TOKEN_DELETE_FAILED, error);
+    // エラーは無視（トークンが既に存在しない可能性があるため）
   }
 }
 

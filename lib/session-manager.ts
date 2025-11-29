@@ -54,8 +54,6 @@ export async function saveSession(sessionId: string, codeVerifier: string): Prom
       if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
         throw new Error('KVが利用できません。Vercel KVまたはUpstash KVの設定を確認してください。');
       }
-      // 開発環境では警告のみ
-      console.warn('KVが利用できません。開発環境ではCookieフォールバックを使用します。');
       throw new Error('KVが利用できません'); // 開発環境でもエラーをスローしてCookieフォールバックを実行
     }
 
@@ -79,19 +77,11 @@ export async function saveSession(sessionId: string, codeVerifier: string): Prom
       }
     );
     
-    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-      console.log('KV SET response:', {
-        status: response.status,
-        ok: response.ok,
-      });
-    }
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to save session to KV: ${errorText}`);
     }
   } catch (error) {
-    console.error('Failed to save session:', error);
     throw new Error('セッションの保存に失敗しました');
   }
 }
@@ -102,7 +92,6 @@ export async function saveSession(sessionId: string, codeVerifier: string): Prom
 export async function getSession(sessionId: string): Promise<string | null> {
   try {
     if (!isKvAvailable()) {
-      console.warn('KVが利用できません。セッションを取得できません。');
       return null;
     }
 
@@ -110,7 +99,6 @@ export async function getSession(sessionId: string): Promise<string | null> {
     const kvToken = getKvRestApiToken();
     
     if (!kvUrl || !kvToken) {
-      console.error('KV credentials are incomplete');
       return null;
     }
 
@@ -126,15 +114,7 @@ export async function getSession(sessionId: string): Promise<string | null> {
       }
     );
     
-    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-      console.log('KV GET response:', {
-        status: response.status,
-        ok: response.ok,
-      });
-    }
-
     if (!response.ok) {
-      console.error('Failed to load session from KV:', response.statusText);
       return null;
     }
 
@@ -144,7 +124,6 @@ export async function getSession(sessionId: string): Promise<string | null> {
     }
     return null;
   } catch (error) {
-    console.error('Failed to get session:', error);
     return null;
   }
 }
@@ -177,10 +156,8 @@ export async function deleteSession(sessionId: string): Promise<void> {
       }
     );
 
-    if (!response.ok) {
-      console.error('Failed to delete session from KV:', response.statusText);
-    }
+    // セッション削除の失敗は無視（既に期限切れの可能性があるため）
   } catch (error) {
-    console.error('Failed to delete session:', error);
+    // エラーは無視
   }
 }

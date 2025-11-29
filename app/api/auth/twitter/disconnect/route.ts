@@ -15,7 +15,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       createSuccessResponse({ message: 'X連携を解除しました' })
     );
   } catch (error) {
-    console.error('Disconnect error:', error);
     return NextResponse.json(
       createErrorResponse(ERROR_MESSAGES.DISCONNECT_FAILED, 'auth', 500),
       { status: 500 }

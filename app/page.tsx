@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import TwitterStatus from '@/components/TwitterStatus';
 import PostForm from '@/components/PostForm';
+import FallingMiku from '@/components/FallingMiku';
 import { TwitterStatusResponse } from '@/lib/types';
 
 export default function Home() {
@@ -34,9 +35,16 @@ export default function Home() {
     try {
       const response = await fetch('/api/status');
       const data = await response.json();
+      // 連携が解除された場合（前回は連携済みだったが、今回は未連携）、認証完了メッセージをクリア
+      if (status?.connected && !data.connected) {
+        setUrlMessage(null);
+      }
       setStatus(data);
     } catch (error) {
-      console.error('Failed to check status:', error);
+      // エラー時も同様に、連携が解除された場合はメッセージをクリア
+      if (status?.connected) {
+        setUrlMessage(null);
+      }
       setStatus({ connected: false });
     } finally {
       setLoading(false);
@@ -44,14 +52,17 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-12 px-4 sm:px-6 lg:px-8 relative" style={{ overflow: 'hidden', position: 'relative' }}>
+      {/* 落下する初音ミクの背景アニメーション */}
+      <FallingMiku />
+      
+      <div className="max-w-2xl mx-auto relative z-10">
         {/* ヘッダー */}
         <div className="text-center mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 drop-shadow-lg">
             ミクポスト
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-700 text-lg font-medium">
             テキストを入力するだけで、初音ミクの画像を自動生成してXにポストできます
           </p>
         </div>
@@ -77,7 +88,7 @@ export default function Home() {
         )}
 
         {/* 投稿フォーム */}
-        <div className="bg-white/40 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-xl animate-fade-in">
+        <div className="bg-white/60 backdrop-blur-lg rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/50 animate-fade-in">
           {loading ? (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>

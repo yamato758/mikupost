@@ -7,6 +7,10 @@
 - **Xアカウント連携**: OAuth 2.0を使用した安全なXアカウント連携
 - **画像自動生成**: 入力テキストをもとに初音ミクのちびキャラ画像を自動生成（Gemini 2.5 Flash Image API使用）
 - **自動投稿**: 生成した画像付きでXに自動投稿（OAuth 1.0aでメディアアップロード）
+- **複数画像アップロード**: 最大4枚まで画像を添付可能（生成画像1枚 + 追加画像3枚）
+- **GIF検索**: Giphy APIを使用したGIF検索・選択機能
+- **絵文字ピッカー**: よく使われる絵文字を簡単に追加
+- **落下アニメーション**: 背景に初音ミクのキャラクターが落下するアニメーション
 - **エラーハンドリング**: 分かりやすいエラーメッセージ表示
 
 ## 技術スタック
@@ -45,6 +49,9 @@ TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret
 # 画像生成API (Gemini)
 NANO_BANANA_API_TOKEN=your_gemini_api_key
 
+# GIF検索API (Giphy)
+GIPHY_API_KEY=your_giphy_api_key
+
 # Vercel KV / Upstash KV（トークン保存用）
 UPSTASH_KV_REST_API_URL=your_kv_url
 UPSTASH_KV_REST_API_TOKEN=your_kv_token
@@ -74,14 +81,21 @@ NEXTAUTH_URL=http://localhost:3000
 1. [Google AI Studio](https://aistudio.google.com/)でAPIキーを取得
 2. `.env.local`に`NANO_BANANA_API_TOKEN`として設定
 
-### 5. Upstash KVの設定（Vercel以外の場合）
+### 5. Giphy APIの設定（オプション）
+
+1. [Giphy Developers](https://developers.giphy.com/)でアカウント作成
+2. APIキーを取得
+3. `.env.local`に`GIPHY_API_KEY`として設定
+   - 注意: APIキーを設定しない場合、デフォルトの公開キーが使用されますが、制限があります
+
+### 6. Upstash KVの設定（Vercel以外の場合）
 
 1. [Upstash](https://upstash.com/)でアカウントを作成
 2. Redis データベースを作成
 3. REST API URLとTokenを取得
 4. `.env.local`に設定
 
-### 6. 開発サーバーの起動
+### 7. 開発サーバーの起動
 
 ```bash
 npm run dev
@@ -97,7 +111,10 @@ npm run dev
 
 2. **投稿**
    - テキストエリアに投稿したいテキストを入力（最大280文字）
-   - 「ポストする」ボタンをクリック
+   - オプション: 画像アイコンから写真を追加（最大3枚）
+   - オプション: GIFボタンからGIFを検索・選択
+   - オプション: 絵文字ボタンから絵文字を追加
+   - 「ポスト」ボタンをクリック
    - 画像生成→X投稿が自動で実行されます
 
 3. **完了**
@@ -111,14 +128,20 @@ mikupost/
 ├── app/                      # Next.js App Router
 │   ├── api/                  # API Routes
 │   │   ├── auth/twitter/     # OAuth認証
+│   │   │   ├── route.ts      # 認証開始
+│   │   │   ├── callback/     # コールバック処理
+│   │   │   └── disconnect/   # 連携解除
 │   │   ├── post/             # 投稿エンドポイント
-│   │   └── status/           # 連携状態確認
+│   │   ├── status/           # 連携状態確認
+│   │   ├── giphy-search/     # GIF検索API
+│   │   └── miku-gif/         # 落下アニメーション用GIF
 │   ├── layout.tsx            # ルートレイアウト
 │   ├── page.tsx              # トップページ
 │   └── globals.css           # グローバルスタイル
 ├── components/               # Reactコンポーネント
-│   ├── PostForm.tsx          # 投稿フォーム
+│   ├── PostForm.tsx          # 投稿フォーム（画像/GIF/絵文字対応）
 │   ├── TwitterStatus.tsx     # X連携状態表示
+│   ├── FallingMiku.tsx       # 落下アニメーション
 │   ├── LoadingSpinner.tsx    # ローディング表示
 │   └── ErrorMessage.tsx      # エラーメッセージ
 └── lib/                      # ユーティリティ
@@ -129,7 +152,7 @@ mikupost/
     ├── oauth-pkce.ts         # OAuth PKCE
     ├── oauth1-upload.ts      # OAuth 1.0aメディアアップロード
     ├── image-generator.ts    # 画像生成
-    └── twitter-client.ts     # X APIクライアント
+    └── twitter-client.ts      # X APIクライアント
 ```
 
 ## Vercelへのデプロイ
@@ -148,6 +171,7 @@ Vercelのプロジェクト設定で以下の環境変数を設定：
 | `TWITTER_ACCESS_TOKEN` | Access Token (Read and write権限) |
 | `TWITTER_ACCESS_TOKEN_SECRET` | Access Token Secret |
 | `NANO_BANANA_API_TOKEN` | Gemini API Key |
+| `GIPHY_API_KEY` | Giphy API Key（オプション） |
 | `NEXTAUTH_URL` | `https://your-domain.vercel.app` |
 
 ### 2. Vercel KVの設定

@@ -11,46 +11,83 @@ import { uploadMediaWithOAuth1, isOAuth1Available } from './oauth1-upload';
  * X APIでメディアをアップロード
  * OAuth 1.0aを使用（OAuth 2.0ではv1.1メディアアップロードは利用不可）
  */
-async function uploadMedia(imageBuffer: Buffer): Promise<string | null> {
+async function uploadMedia(imageBuffer: Buffer, mimeType?: string): Promise<string | null> {
   if (!isOAuth1Available()) {
-    console.error('OAuth 1.0a credentials not available');
     return null;
   }
 
   try {
-    const result = await uploadMediaWithOAuth1(imageBuffer);
+    const result = await uploadMediaWithOAuth1(imageBuffer, mimeType);
     
     if (!result.mediaId) {
-      console.error('Media upload failed:', result.error);
       return null;
     }
     
     return result.mediaId;
   } catch (error) {
-    console.error('Media upload error:', error);
     return null;
   }
 }
 
 /**
+ * 複数の画像をアップロード
+ */
+async function uploadMultipleMedia(
+  imageBuffers: Buffer[],
+  mimeTypes?: string[]
+): Promise<string[]> {
+  const mediaIds: string[] = [];
+  
+  for (let i = 0; i < imageBuffers.length; i++) {
+    const mimeType = mimeTypes && mimeTypes[i] ? mimeTypes[i] : undefined;
+    const mediaId = await uploadMedia(imageBuffers[i], mimeType);
+    if (mediaId) {
+      mediaIds.push(mediaId);
+    }
+  }
+  
+  return mediaIds;
+}
+
+/**
  * X API v2でツイートを作成
  */
-export async function createTweet(text: string, imageUrl?: string): Promise<{ tweetId: string; tweetUrl: string } | null> {
+export async function createTweet(
+  text: string, 
+  imageUrl?: string,
+  additionalImageBuffers?: Buffer[]
+): Promise<{ tweetId: string; tweetUrl: string } | null> {
   const tokens = await loadTokens();
   if (!tokens || !tokens.access_token) {
     throw new Error('アクセストークンがありません');
   }
 
   try {
-    let mediaId: string | null = null;
+    const mediaIds: string[] = [];
 
-    // 画像が提供されている場合のみアップロード
+    // 生成された画像をアップロード
     if (imageUrl) {
       const imageBuffer = await fetchImageAsBuffer(imageUrl);
       if (imageBuffer) {
-        mediaId = await uploadMedia(imageBuffer);
+        const mediaId = await uploadMedia(imageBuffer);
+        if (mediaId) {
+          mediaIds.push(mediaId);
+        }
       }
     }
+
+    // 追加画像をアップロード（MIMEタイプも渡す）
+    if (additionalImageBuffers && additionalImageBuffers.length > 0) {
+      // MIMEタイプが渡されていない場合はundefinedを渡す（自動検出）
+      const additionalMediaIds = await uploadMultipleMedia(
+        additionalImageBuffers,
+        undefined // MIMEタイプはoauth1-upload.tsで自動検出される
+      );
+      mediaIds.push(...additionalMediaIds);
+    }
+
+    // 最大4枚まで
+    const finalMediaIds = mediaIds.slice(0, 4);
 
     // ツイートを作成
     const tweetData: {
@@ -62,9 +99,9 @@ export async function createTweet(text: string, imageUrl?: string): Promise<{ tw
       text: text,
     };
 
-    if (mediaId) {
+    if (finalMediaIds.length > 0) {
       tweetData.media = {
-        media_ids: [mediaId],
+        media_ids: finalMediaIds,
       };
     }
 
@@ -78,8 +115,6 @@ export async function createTweet(text: string, imageUrl?: string): Promise<{ tw
     });
 
     if (!tweetResponse.ok) {
-      const errorText = await tweetResponse.text();
-      console.error('Tweet creation error:', errorText);
       return null;
     }
 
@@ -123,7 +158,6 @@ export async function getMe(): Promise<{ id: string; username: string } | null> 
       username: data.data.username,
     };
   } catch (error) {
-    console.error('Get me error:', error);
     return null;
   }
 }

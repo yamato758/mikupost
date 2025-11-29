@@ -11,15 +11,46 @@ import { ERROR_MESSAGES } from '@/lib/constants';
  */
 export async function POST(request: NextRequest): Promise<NextResponse<PostResponse | ErrorResponse>> {
   try {
-    // リクエストボディを取得
-    const body = await request.json();
-    const { text } = body;
+    // FormDataまたはJSONのリクエストを処理
+    const contentType = request.headers.get('content-type') || '';
+    let text: string;
+    let additionalImageBuffers: Buffer[] = [];
+    let additionalMimeTypes: string[] = [];
+
+    if (contentType.includes('multipart/form-data')) {
+      // FormDataの場合
+      const formData = await request.formData();
+      text = formData.get('text') as string;
+
+      // 追加画像を取得（image0, image1, image2）
+      for (let i = 0; i < 3; i++) {
+        const imageFile = formData.get(`image${i}`) as File | null;
+        if (imageFile) {
+          const arrayBuffer = await imageFile.arrayBuffer();
+          additionalImageBuffers.push(Buffer.from(arrayBuffer));
+          // MIMEタイプを取得（Fileオブジェクトから）
+          additionalMimeTypes.push(imageFile.type || 'image/png');
+        }
+      }
+    } else {
+      // JSONの場合（後方互換性のため）
+      const body = await request.json();
+      text = body.text;
+    }
 
     // バリデーション
     const validation = validateTweetText(text);
     if (!validation.valid) {
       return NextResponse.json(
         createErrorResponse(validation.error || ERROR_MESSAGES.VALIDATION_REQUIRED, 'validation', 400),
+        { status: 400 }
+      );
+    }
+
+    // 追加画像の枚数チェック
+    if (additionalImageBuffers.length > 3) {
+      return NextResponse.json(
+        createErrorResponse('追加できる画像は最大3枚までです', 'validation', 400),
         { status: 400 }
       );
     }
@@ -38,17 +69,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
     let imageUrl: string | undefined = undefined;
     
     if (!imageResult.success || !imageResult.imageUrl) {
-      console.warn('Image generation failed:', imageResult.error);
       // 画像生成に失敗した場合は、画像なしでツイートを試みる
-      console.log('Attempting to post without image due to image generation failure');
     } else {
       imageUrl = imageResult.imageUrl;
     }
 
-    // Xに投稿（画像がある場合は画像付き、ない場合は画像なし）
-    const tweetResult = await createTweet(text, imageUrl);
+    // Xに投稿（生成画像 + 追加画像）
+    const tweetResult = await createTweet(
+      text, 
+      imageUrl, 
+      additionalImageBuffers.length > 0 ? additionalImageBuffers : undefined
+    );
     if (!tweetResult) {
-      console.error('Tweet creation failed');
       return NextResponse.json(
         createErrorResponse(ERROR_MESSAGES.TWEET_POST_FAILED, 'tweet_post', 500),
         { status: 500 }
@@ -62,7 +94,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
       imageUrl: imageUrl,
     } as PostResponse);
   } catch (error) {
-    console.error('Post API error:', error);
     return NextResponse.json(
       createErrorResponse(ERROR_MESSAGES.NETWORK_ERROR, 'network', 500),
       { status: 500 }

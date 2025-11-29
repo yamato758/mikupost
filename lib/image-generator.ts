@@ -102,14 +102,8 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
 
     const data = (await response.json()) as GeminiApiResponse;
     
-    // デバッグ用: レスポンス構造をログに出力（本番環境では削除推奨）
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Gemini API response structure:', JSON.stringify(data, null, 2).substring(0, 1000));
-    }
-    
     // レスポンス形式: candidates[0].content.parts[0].inlineData.data (base64)
     if (!data.candidates || !data.candidates[0]) {
-      console.error('Unexpected response format - no candidates:', data);
       return {
         success: false,
         error: '画像生成のレスポンス形式が予期しない形式でした（candidatesが見つかりません）',
@@ -118,7 +112,6 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
 
     const candidate = data.candidates[0];
     if (!candidate.content) {
-      console.error('Unexpected response format - no content:', data);
       return {
         success: false,
         error: '画像生成のレスポンス形式が予期しない形式でした（contentが見つかりません）',
@@ -127,7 +120,6 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
 
     const parts = candidate.content.parts;
     if (!parts || !Array.isArray(parts) || parts.length === 0) {
-      console.error('No parts in response:', data);
       return {
         success: false,
         error: '画像データがレスポンスに含まれていませんでした（partsが見つかりません）',
@@ -138,36 +130,21 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
     let base64Image: string | null = null;
     let mimeType: string = 'image/png';
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Searching for image data in parts array, length:', parts.length);
-    }
-    
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Part ${i}:`, part.text ? `text: ${part.text.substring(0, 50)}...` : part.inlineData ? `inlineData: ${part.inlineData.mimeType}` : 'unknown');
-      }
       
       if (part.inlineData && part.inlineData.data) {
         base64Image = part.inlineData.data;
         mimeType = part.inlineData.mimeType || 'image/png';
-        if (process.env.NODE_ENV === 'development' && base64Image) {
-          console.log('Found image data in part', i, 'mimeType:', mimeType, 'data length:', base64Image.length);
-        }
         break;
       }
     }
 
     if (!base64Image) {
-      // partsの内容を詳しく確認
-      console.error('No image data in response parts:', JSON.stringify(parts, null, 2));
-      
       // テキストメッセージが含まれている場合（エラーメッセージの可能性）
       const textParts = parts.filter((p: any) => p.text);
       if (textParts.length > 0) {
         const errorText = textParts.map((p: any) => p.text).join(' ');
-        console.error('Text message in response:', errorText);
         return {
           success: false,
           error: `画像生成がブロックされました: ${errorText.substring(0, 200)}`,
@@ -182,19 +159,15 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
     
     // base64データをdata URL形式に変換
     const imageUrl = `data:${mimeType};base64,${base64Image}`;
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Image URL created, length:', imageUrl.length);
-    }
 
     return {
       success: true,
       imageUrl: imageUrl,
     };
-  } catch (error) {
-    console.error('Image generation error:', error);
+  } catch (error: any) {
     return {
       success: false,
-      error: '画像生成中にエラーが発生しました',
+      error: `画像生成中にエラーが発生しました: ${error.message || '不明なエラー'}`,
     };
   }
 }
@@ -221,7 +194,6 @@ export async function fetchImageAsBuffer(imageUrl: string): Promise<Buffer | nul
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error) {
-    console.error('Failed to fetch image:', error);
     return null;
   }
 }

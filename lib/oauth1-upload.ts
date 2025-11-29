@@ -14,7 +14,6 @@ function getTwitterClient(): TwitterApi | null {
   const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET;
   
   if (!appKey || !appSecret || !accessToken || !accessSecret) {
-    console.error('Missing Twitter OAuth 1.0a credentials');
     return null;
   }
   
@@ -27,9 +26,33 @@ function getTwitterClient(): TwitterApi | null {
 }
 
 /**
+ * BufferからMIMEタイプを検出
+ */
+function detectMimeType(buffer: Buffer): string {
+  // マジックナンバーで判定
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8) {
+    return 'image/jpeg';
+  }
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'image/png';
+  }
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+    return 'image/gif';
+  }
+  if (buffer[0] === 0x57 && buffer[1] === 0x45 && buffer[2] === 0x42 && buffer[3] === 0x50) {
+    return 'image/webp';
+  }
+  // デフォルトはPNG
+  return 'image/png';
+}
+
+/**
  * OAuth 1.0aでメディアをアップロード
  */
-export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ mediaId: string | null; error?: string; status?: number; details?: string }> {
+export async function uploadMediaWithOAuth1(
+  imageBuffer: Buffer,
+  mimeType?: string
+): Promise<{ mediaId: string | null; error?: string; status?: number; details?: string }> {
   const client = getTwitterClient();
   if (!client) {
     return {
@@ -39,14 +62,15 @@ export async function uploadMediaWithOAuth1(imageBuffer: Buffer): Promise<{ medi
   }
   
   try {
+    // MIMEタイプが指定されていない場合は自動検出
+    const detectedMimeType = mimeType || detectMimeType(imageBuffer);
+    
     const mediaId = await client.v1.uploadMedia(imageBuffer, {
-      mimeType: 'image/png',
+      mimeType: detectedMimeType,
     });
     
     return { mediaId };
   } catch (error: any) {
-    console.error('Media upload error:', error.message || error);
-    
     let details = '';
     if (error.data) {
       details = JSON.stringify(error.data);

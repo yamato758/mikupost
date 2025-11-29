@@ -35,11 +35,7 @@ export async function GET(request: NextRequest) {
   try {
     await saveSession(sessionId, verifier);
     kvSaved = true;
-    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-      console.log('Session saved to KV successfully');
-    }
   } catch (error) {
-    console.error('Failed to save session to KV:', error);
     // KV保存に失敗した場合は、Cookieに保存（フォールバック）
     kvSaved = false;
   }
@@ -54,28 +50,11 @@ export async function GET(request: NextRequest) {
       maxAge: 600,
       path: '/',
     });
-    if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-      console.log('Session saved to Cookie as fallback');
-    }
   } catch (cookieError) {
-    console.error('Failed to save session to Cookie:', cookieError);
     // Cookie保存にも失敗した場合は、エラーをスロー
     if (!kvSaved) {
       throw new Error('Failed to save session to both KV and Cookie');
     }
-  }
-  
-  // デバッグ用
-  if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-    console.log('Session created:', {
-      sessionId,
-      hasVerifier: !!verifier,
-      verifierLength: verifier.length,
-    });
-  }
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('OAuth code_verifier saved to cookie');
   }
 
   // OAuth 2.0認証URLを生成
@@ -88,17 +67,6 @@ export async function GET(request: NextRequest) {
   authUrl.searchParams.set('state', `${OAUTH_STATE}:${sessionId}`);
   authUrl.searchParams.set('code_challenge', challenge);
   authUrl.searchParams.set('code_challenge_method', 'S256'); // SHA256を使用
-
-  // デバッグログ（開発環境のみ）
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('OAuth authorization URL:', {
-      url: authUrl.toString(),
-      clientId: clientId.substring(0, 10) + '...',
-      redirectUri,
-      scopes: TWITTER_OAUTH_SCOPES,
-      hasCodeChallenge: !!challenge,
-    });
-  }
 
   return NextResponse.redirect(authUrl.toString());
 }
