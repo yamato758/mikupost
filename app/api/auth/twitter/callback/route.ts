@@ -115,6 +115,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text().catch(() => '');
+      console.error('Token exchange failed:', tokenResponse.status, errorText);
       const errorUrl = new URL('/', baseUrl);
       errorUrl.searchParams.set('error', ERROR_MESSAGES.TOKEN_EXCHANGE_FAILED);
       return NextResponse.redirect(errorUrl.toString());
@@ -138,8 +140,13 @@ export async function GET(request: NextRequest) {
     successUrl.searchParams.set('success', '認証が完了しました');
     return NextResponse.redirect(successUrl.toString());
   } catch (error) {
+    console.error('Auth callback error:', error);
+    const errorMessage =
+      error instanceof Error && error.message
+        ? error.message
+        : '認証処理中にエラーが発生しました';
     const errorUrl = new URL('/', baseUrl);
-    errorUrl.searchParams.set('error', '認証処理中にエラーが発生しました');
+    errorUrl.searchParams.set('error', errorMessage);
     return NextResponse.redirect(errorUrl.toString());
   }
 }
