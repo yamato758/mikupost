@@ -7,6 +7,10 @@ import { fetchImageAsBuffer } from './image-generator';
 import { TWITTER_API_BASE } from './constants';
 import { uploadMediaWithOAuth1, isOAuth1Available } from './oauth1-upload';
 
+export type TweetPostResult =
+  | { success: true; tweetId: string; tweetUrl: string }
+  | { success: false; error: string; status?: number };
+
 /**
  * X APIでメディアをアップロード
  * OAuth 1.0aを使用（OAuth 2.0ではv1.1メディアアップロードは利用不可）
@@ -56,10 +60,13 @@ export async function createTweet(
   text: string, 
   imageUrl?: string,
   additionalImageBuffers?: Buffer[]
-): Promise<{ tweetId: string; tweetUrl: string } | null> {
+): Promise<TweetPostResult> {
   const tokens = await loadTokens();
   if (!tokens || !tokens.access_token) {
-    throw new Error('アクセストークンがありません');
+    return {
+      success: false,
+      error: 'アクセストークンがありません',
+    };
   }
 
   try {
@@ -115,7 +122,35 @@ export async function createTweet(
     });
 
     if (!tweetResponse.ok) {
-      return null;
+      const errorText = await tweetResponse.text().catch(() => '');
+      let errorMessage = `X APIへのポストに失敗しました (${tweetResponse.status}: ${tweetResponse.statusText})`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        const firstError = Array.isArray(errorData.errors) ? errorData.errors[0] : undefined;
+        errorMessage =
+          firstError?.message ||
+          errorData.detail ||
+          errorData.title ||
+          errorData.error ||
+          errorMessage;
+      } catch {
+        if (errorText) {
+          errorMessage = errorText.substring(0, 300);
+        }
+      }
+
+      console.error('Tweet post failed:', {
+        status: tweetResponse.status,
+        statusText: tweetResponse.statusText,
+        errorText,
+      });
+
+      return {
+        success: false,
+        error: errorMessage,
+        status: tweetResponse.status,
+      };
     }
 
     const tweet = (await tweetResponse.json()) as TwitterTweetResponse;
@@ -123,12 +158,16 @@ export async function createTweet(
     const tweetUrl = `https://twitter.com/i/web/status/${tweetId}`;
 
     return {
+      success: true,
       tweetId,
       tweetUrl,
     };
   } catch (error) {
     console.error('Create tweet error:', error);
-    return null;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Xへのポスト中に不明なエラーが発生しました',
+    };
   }
 }
 

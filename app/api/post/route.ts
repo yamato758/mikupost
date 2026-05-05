@@ -80,10 +80,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
       imageUrl, 
       additionalImageBuffers.length > 0 ? additionalImageBuffers : undefined
     );
-    if (!tweetResult) {
+    if (!tweetResult.success) {
       return NextResponse.json(
-        createErrorResponse(ERROR_MESSAGES.TWEET_POST_FAILED, 'tweet_post', 500),
-        { status: 500 }
+        createErrorResponse(tweetResult.error || ERROR_MESSAGES.TWEET_POST_FAILED, 'tweet_post', tweetResult.status || 500),
+        { status: tweetResult.status || 500 }
       );
     }
 
