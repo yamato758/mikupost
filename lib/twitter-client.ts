@@ -140,12 +140,6 @@ export async function createTweet(
         }
       }
 
-      console.error('Tweet post failed:', {
-        status: tweetResponse.status,
-        statusText: tweetResponse.statusText,
-        errorText,
-      });
-
       return {
         success: false,
         error: errorMessage,
@@ -163,7 +157,6 @@ export async function createTweet(
       tweetUrl,
     };
   } catch (error) {
-    console.error('Create tweet error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Xへのポスト中に不明なエラーが発生しました',

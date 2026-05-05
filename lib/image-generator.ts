@@ -53,12 +53,6 @@ export async function generateImage(userText: string): Promise<ImageGenerationRe
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText: errorText,
-      });
-      
       let errorMessage = `画像生成APIへのリクエストに失敗しました (${response.status}: ${response.statusText})`;
       
       try {

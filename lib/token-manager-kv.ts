@@ -88,8 +88,7 @@ export async function loadTokens(): Promise<TwitterTokens | null> {
           const fileContent = fs.readFileSync(TOKENS_FILE_PATH, 'utf-8');
           return JSON.parse(fileContent) as TwitterTokens;
         }
-      } catch (fsError) {
-        console.warn('File system fallback failed:', fsError);
+      } catch {
       }
     }
     
@@ -147,8 +146,7 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
         
         fs.writeFileSync(TOKENS_FILE_PATH, JSON.stringify(tokens, null, 2), 'utf-8');
         return;
-      } catch (fsError) {
-        console.warn('File system fallback failed:', fsError);
+      } catch {
         // フォールバックが失敗した場合はエラーをスロー
         throw new Error('KVが利用できず、ファイルシステムへの書き込みも失敗しました。KVの設定を確認してください。');
       }
@@ -156,8 +154,7 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
     
     // 本番環境でKVが利用できない場合はエラー
     throw new Error('KVが利用できません。Vercel KVまたはUpstash KVの設定を確認してください。');
-  } catch (error) {
-    console.error(ERROR_MESSAGES.TOKEN_SAVE_FAILED, error);
+  } catch {
     throw new Error(ERROR_MESSAGES.TOKEN_SAVE_FAILED);
   }
 }
@@ -173,7 +170,6 @@ export async function deleteTokens(): Promise<void> {
       const kvToken = getKvRestApiToken();
       
       if (!kvUrl || !kvToken) {
-        console.error('KV credentials are incomplete');
         return;
       }
 
