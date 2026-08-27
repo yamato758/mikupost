@@ -3,8 +3,6 @@
  * code_verifierをKVに保存して、Cookieに依存しないセッション管理を実現
  */
 
-import { ERROR_MESSAGES } from './constants';
-
 const SESSION_KEY_PREFIX = 'oauth_session:';
 const SESSION_TTL = 600; // 10分（秒）
 
@@ -38,6 +36,34 @@ function getKvRestApiToken(): string | undefined {
 }
 
 /**
+ * Upstash Redis REST APIのコマンド形式でKVを操作する
+ */
+async function executeKvCommand<T>(command: unknown[]): Promise<T | null> {
+  const kvUrl = getKvRestApiUrl();
+  const kvToken = getKvRestApiToken();
+
+  if (!kvUrl || !kvToken) {
+    throw new Error('KV credentials are incomplete');
+  }
+
+  const response = await fetch(kvUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${kvToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(command),
+  });
+
+  if (!response.ok) {
+    throw new Error(`KV request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.result ?? null) as T | null;
+}
+
+/**
  * セッションIDを生成
  */
 export function generateSessionId(): string {
@@ -57,31 +83,9 @@ export async function saveSession(sessionId: string, codeVerifier: string): Prom
       throw new Error('KVが利用できません'); // 開発環境でもエラーをスローしてCookieフォールバックを実行
     }
 
-    const kvUrl = getKvRestApiUrl();
-    const kvToken = getKvRestApiToken();
-    
-    if (!kvUrl || !kvToken) {
-      throw new Error('KV credentials are incomplete');
-    }
-
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
-    // Upstash Redis REST API: SET key value EX ttl
-    // 形式: POST /set/key/value/ex/ttl または POST / with body ["SET", "key", "value", "EX", ttl]
-    const response = await fetch(
-      `${kvUrl}/set/${encodeURIComponent(sessionKey)}/${encodeURIComponent(codeVerifier)}/ex/${SESSION_TTL}`,
-      {
-        method: 'GET', // Upstash REST APIはGETでコマンドを実行
-        headers: {
-          'Authorization': `Bearer ${kvToken}`,
-        },
-      }
-    );
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to save session to KV: ${errorText}`);
-    }
-  } catch (error) {
+    await executeKvCommand(['SET', sessionKey, codeVerifier, 'EX', SESSION_TTL]);
+  } catch {
     throw new Error('セッションの保存に失敗しました');
   }
 }
@@ -95,35 +99,9 @@ export async function getSession(sessionId: string): Promise<string | null> {
       return null;
     }
 
-    const kvUrl = getKvRestApiUrl();
-    const kvToken = getKvRestApiToken();
-    
-    if (!kvUrl || !kvToken) {
-      return null;
-    }
-
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
-    // Upstash Redis REST API: GET key
-    const response = await fetch(
-      `${kvUrl}/get/${encodeURIComponent(sessionKey)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${kvToken}`,
-        },
-      }
-    );
-    
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    if (data.result) {
-      return data.result as string;
-    }
-    return null;
-  } catch (error) {
+    return await executeKvCommand<string>(['GET', sessionKey]);
+  } catch {
     return null;
   }
 }
@@ -137,27 +115,11 @@ export async function deleteSession(sessionId: string): Promise<void> {
       return;
     }
 
-    const kvUrl = getKvRestApiUrl();
-    const kvToken = getKvRestApiToken();
-    
-    if (!kvUrl || !kvToken) {
-      return;
-    }
-
     const sessionKey = `${SESSION_KEY_PREFIX}${sessionId}`;
-    // Upstash Redis REST API: DEL key
-    const response = await fetch(
-      `${kvUrl}/del/${encodeURIComponent(sessionKey)}`,
-      {
-        method: 'GET', // Upstash REST APIはGETでコマンドを実行
-        headers: {
-          'Authorization': `Bearer ${kvToken}`,
-        },
-      }
-    );
+    await executeKvCommand(['DEL', sessionKey]);
 
     // セッション削除の失敗は無視（既に期限切れの可能性があるため）
-  } catch (error) {
+  } catch {
     // エラーは無視
   }
 }

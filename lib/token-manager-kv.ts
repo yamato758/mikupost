@@ -39,38 +39,44 @@ function getKvRestApiToken(): string | undefined {
 }
 
 /**
+ * Upstash Redis REST APIのコマンド形式でKVを操作する
+ */
+async function executeKvCommand<T>(command: unknown[]): Promise<T | null> {
+  const kvUrl = getKvRestApiUrl();
+  const kvToken = getKvRestApiToken();
+
+  if (!kvUrl || !kvToken) {
+    throw new Error('KV credentials are incomplete');
+  }
+
+  const response = await fetch(kvUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${kvToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(command),
+  });
+
+  if (!response.ok) {
+    throw new Error(`KV request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.result ?? null) as T | null;
+}
+
+/**
  * アクセストークンを読み込む
  */
 export async function loadTokens(): Promise<TwitterTokens | null> {
   try {
     // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
-      const kvUrl = getKvRestApiUrl();
-      const kvToken = getKvRestApiToken();
-      
-      if (!kvUrl || !kvToken) {
-        return null;
-      }
+      const result = await executeKvCommand<string>(['GET', TOKEN_KEY]);
 
-      // Upstash REST API: GET /get/key
-      const response = await fetch(
-        `${kvUrl}/get/${encodeURIComponent(TOKEN_KEY)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${kvToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      
-      if (data.result) {
-        return JSON.parse(data.result) as TwitterTokens;
+      if (result) {
+        return JSON.parse(result) as TwitterTokens;
       }
       return null;
     }
@@ -105,29 +111,8 @@ export async function saveTokens(tokens: TwitterTokens): Promise<void> {
   try {
     // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
-      const kvUrl = getKvRestApiUrl();
-      const kvToken = getKvRestApiToken();
-      
-      if (!kvUrl || !kvToken) {
-        throw new Error('KV credentials are incomplete');
-      }
-
-      // Upstash REST API: GET /set/key/value
       const tokenJson = JSON.stringify(tokens);
-      const response = await fetch(
-        `${kvUrl}/set/${encodeURIComponent(TOKEN_KEY)}/${encodeURIComponent(tokenJson)}`,
-        {
-          method: 'GET', // Upstash REST APIはGETでコマンドを実行
-          headers: {
-            'Authorization': `Bearer ${kvToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to save tokens to KV: ${errorText}`);
-      }
+      await executeKvCommand(['SET', TOKEN_KEY, tokenJson]);
       return;
     }
 
@@ -166,24 +151,7 @@ export async function deleteTokens(): Promise<void> {
   try {
     // Vercel KVまたはUpstash KVが利用可能な場合
     if (isKvAvailable()) {
-      const kvUrl = getKvRestApiUrl();
-      const kvToken = getKvRestApiToken();
-      
-      if (!kvUrl || !kvToken) {
-        return;
-      }
-
-      // Upstash REST API: GET /del/key
-      const response = await fetch(
-        `${kvUrl}/del/${encodeURIComponent(TOKEN_KEY)}`,
-        {
-          method: 'GET', // Upstash REST APIはGETでコマンドを実行
-          headers: {
-            'Authorization': `Bearer ${kvToken}`,
-          },
-        }
-      );
-
+      await executeKvCommand(['DEL', TOKEN_KEY]);
       // 削除の失敗は無視（既に存在しない可能性があるため）
       return;
     }
