@@ -64,36 +64,32 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
   const redirectUri = process.env.TWITTER_REDIRECT_URI!;
 
-  // stateパラメータからセッションIDを取得
   let sessionId: string | null = null;
+  let codeVerifier: string | null = null;
   if (state && state.startsWith(`${OAUTH_STATE}:`)) {
-    sessionId = state.split(':')[1];
+    const rest = state.slice(`${OAUTH_STATE}:`.length);
+    const [id, verifierFromState] = rest.split(':');
+    sessionId = id || null;
+    if (verifierFromState) {
+      codeVerifier = verifierFromState;
+    }
   }
 
-  // KVからcode_verifierを取得（優先）
-  let codeVerifier: string | null = null;
-  if (sessionId) {
+  if (!codeVerifier && sessionId) {
     try {
       codeVerifier = await getSession(sessionId);
       if (codeVerifier) {
-        // 使用済みのセッションを削除
         await deleteSession(sessionId);
       }
-    } catch (error) {
+    } catch {
       // KVからの取得に失敗した場合はCookieフォールバックに進む
     }
   }
 
-  // フォールバック: Cookieから取得
   if (!codeVerifier) {
     const cookieStore = await cookies();
     const codeVerifierCookie = cookieStore.get('oauth_code_verifier');
     codeVerifier = codeVerifierCookie?.value || null;
-    
-    if (codeVerifier) {
-      // 使用済みのCookieを削除
-      cookieStore.delete('oauth_code_verifier');
-    }
   }
 
   if (!codeVerifier) {
@@ -147,6 +143,7 @@ export async function GET(request: NextRequest) {
       serializeTokenCookie(tokens),
       getTokenCookieOptions()
     );
+    response.cookies.set('oauth_code_verifier', '', { path: '/', maxAge: 0 });
     return response;
   } catch (error) {
     const errorMessage =
