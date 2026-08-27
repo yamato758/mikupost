@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadTokens, isTokenValid } from '@/lib/token-manager-kv';
+import { loadTokens, isTokenValid, attachTokenCookie } from '@/lib/token-manager-kv';
 import { generateImage } from '@/lib/image-generator';
 import { createTweet } from '@/lib/twitter-client';
 import { PostResponse, ErrorResponse } from '@/lib/types';
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
 
     // X連携状態を確認
     const tokens = await loadTokens();
-    if (!isTokenValid(tokens)) {
+    if (!isTokenValid(tokens) || !tokens) {
       return NextResponse.json(
         createErrorResponse(ERROR_MESSAGES.NOT_CONNECTED, 'auth', 401),
         { status: 401 }
@@ -87,12 +87,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<PostRespo
       );
     }
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       tweetId: tweetResult.tweetId,
       tweetUrl: tweetResult.tweetUrl,
       imageUrl: imageUrl,
-    } as PostResponse);
+    } as PostResponse;
+    const response = NextResponse.json(payload);
+    attachTokenCookie(response, tokens);
+    return response;
   } catch (error) {
     return NextResponse.json(
       createErrorResponse(ERROR_MESSAGES.NETWORK_ERROR, 'network', 500),

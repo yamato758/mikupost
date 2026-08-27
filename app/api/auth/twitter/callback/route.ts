@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   saveTokens,
-  TOKEN_COOKIE_NAME,
-  getTokenCookieOptions,
-  serializeTokenCookie,
+  attachTokenCookie,
 } from '@/lib/token-manager-kv';
 import { TwitterTokens, TwitterTokenResponse } from '@/lib/types';
 import { TWITTER_API_BASE, ERROR_MESSAGES, OAUTH_STATE } from '@/lib/constants';
@@ -137,12 +135,26 @@ export async function GET(request: NextRequest) {
 
     const successUrl = new URL('/', baseUrl);
     successUrl.searchParams.set('success', '認証が完了しました');
-    const response = NextResponse.redirect(successUrl.toString());
-    response.cookies.set(
-      TOKEN_COOKIE_NAME,
-      serializeTokenCookie(tokens),
-      getTokenCookieOptions()
-    );
+    const html = `<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0;url=${successUrl.toString()}">
+    <title>認証完了</title>
+  </head>
+  <body>
+    <script>location.replace(${JSON.stringify(successUrl.toString())})</script>
+    <p>認証が完了しました。移動しない場合は <a href="${successUrl.toString()}">こちら</a></p>
+  </body>
+</html>`;
+    const response = new NextResponse(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
+    attachTokenCookie(response, tokens);
     response.cookies.set('oauth_code_verifier', '', { path: '/', maxAge: 0 });
     return response;
   } catch (error) {

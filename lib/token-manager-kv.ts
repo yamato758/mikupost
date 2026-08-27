@@ -4,7 +4,9 @@
  */
 
 import { cookies } from 'next/headers';
-import { TwitterTokens } from './types';
+import { NextResponse } from 'next/server';
+import { TwitterTokens, TwitterTokenResponse } from './types';
+import { TWITTER_API_BASE } from './constants';
 
 const TOKEN_KEY = 'twitter_tokens';
 export const TOKEN_COOKIE_NAME = 'mikupost_twitter_tokens';
@@ -58,14 +60,76 @@ async function executeKvCommand<T>(command: unknown[]): Promise<T | null> {
 
 function parseTokens(raw: string): TwitterTokens | null {
   try {
-    const tokens = JSON.parse(raw) as TwitterTokens;
-    if (!tokens?.access_token) {
+    const decoded = raw.includes('%') ? decodeURIComponent(raw) : raw;
+    const tokens = JSON.parse(decoded) as TwitterTokens;
+    if (!tokens?.access_token && !tokens?.refresh_token) {
       return null;
     }
     return tokens;
   } catch {
+    try {
+      const tokens = JSON.parse(raw) as TwitterTokens;
+      if (!tokens?.access_token && !tokens?.refresh_token) {
+        return null;
+      }
+      return tokens;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function isAccessTokenFresh(tokens: TwitterTokens): boolean {
+  if (!tokens.access_token) {
+    return false;
+  }
+  if (!tokens.expires_at) {
+    return true;
+  }
+  return tokens.expires_at > Math.floor(Date.now() / 1000) + 60;
+}
+
+async function refreshTwitterTokens(tokens: TwitterTokens): Promise<TwitterTokens | null> {
+  if (!tokens.refresh_token) {
     return null;
   }
+
+  const clientId = process.env.TWITTER_CLIENT_ID;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+
+  const response = await fetch(`${TWITTER_API_BASE}/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: tokens.refresh_token,
+      client_id: clientId,
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const tokenData = (await response.json()) as TwitterTokenResponse;
+  if (!tokenData.access_token) {
+    return null;
+  }
+
+  return {
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token || tokens.refresh_token,
+    expires_at: tokenData.expires_in
+      ? Math.floor(Date.now() / 1000) + tokenData.expires_in
+      : undefined,
+    token_type: tokenData.token_type || 'bearer',
+  };
 }
 
 export function getTokenCookieOptions() {
@@ -76,11 +140,17 @@ export function getTokenCookieOptions() {
     sameSite: 'lax' as const,
     path: '/',
     maxAge: TOKEN_COOKIE_MAX_AGE,
+    expires: new Date(Date.now() + TOKEN_COOKIE_MAX_AGE * 1000),
   };
 }
 
 export function serializeTokenCookie(tokens: TwitterTokens): string {
-  return JSON.stringify(tokens);
+  return encodeURIComponent(JSON.stringify(tokens));
+}
+
+export function attachTokenCookie<T extends NextResponse>(response: T, tokens: TwitterTokens): T {
+  response.cookies.set(TOKEN_COOKIE_NAME, serializeTokenCookie(tokens), getTokenCookieOptions());
+  return response;
 }
 
 async function loadTokensFromCookie(): Promise<TwitterTokens | null> {
@@ -118,34 +188,48 @@ async function loadTokensFromKv(): Promise<TwitterTokens | null> {
  * アクセストークンを読み込む
  */
 export async function loadTokens(): Promise<TwitterTokens | null> {
-  const fromCookie = await loadTokensFromCookie();
-  if (fromCookie) {
-    return fromCookie;
-  }
+  let stored: TwitterTokens | null = await loadTokensFromCookie();
 
-  try {
-    const fromKv = await loadTokensFromKv();
-    if (fromKv) {
-      return fromKv;
+  if (!stored) {
+    try {
+      stored = await loadTokensFromKv();
+    } catch {
+      stored = null;
     }
-  } catch {
-    // KVが死んでいてもCookieで継続できるようにする
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (!stored && process.env.NODE_ENV === 'development') {
     try {
       const fs = await import('fs');
       const path = await import('path');
       const TOKENS_FILE_PATH = path.join(process.cwd(), 'data', 'tokens.json');
       if (fs.existsSync(TOKENS_FILE_PATH)) {
-        return parseTokens(fs.readFileSync(TOKENS_FILE_PATH, 'utf-8'));
+        stored = parseTokens(fs.readFileSync(TOKENS_FILE_PATH, 'utf-8'));
       }
     } catch {
-      // ignore
+      stored = null;
     }
   }
 
-  return null;
+  if (!stored) {
+    return null;
+  }
+
+  if (isAccessTokenFresh(stored)) {
+    return stored;
+  }
+
+  try {
+    const refreshed = await refreshTwitterTokens(stored);
+    if (refreshed) {
+      await saveTokens(refreshed);
+      return refreshed;
+    }
+  } catch {
+    // 更新失敗時は期限切れトークンを返す（呼び出し側で判定）
+  }
+
+  return stored;
 }
 
 /**
@@ -205,14 +289,8 @@ export async function deleteTokens(): Promise<void> {
  * トークンが有効かどうかをチェック
  */
 export function isTokenValid(tokens: TwitterTokens | null): boolean {
-  if (!tokens || !tokens.access_token) {
+  if (!tokens) {
     return false;
   }
-
-  if (tokens.expires_at) {
-    const now = Math.floor(Date.now() / 1000);
-    return tokens.expires_at > now;
-  }
-
-  return true;
+  return isAccessTokenFresh(tokens);
 }
