@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveTokens } from '@/lib/token-manager-kv';
+import {
+  saveTokens,
+  TOKEN_COOKIE_NAME,
+  getTokenCookieOptions,
+  serializeTokenCookie,
+} from '@/lib/token-manager-kv';
 import { TwitterTokens, TwitterTokenResponse } from '@/lib/types';
 import { TWITTER_API_BASE, ERROR_MESSAGES, OAUTH_STATE } from '@/lib/constants';
 import { validateEnvVars } from '@/lib/utils';
@@ -136,7 +141,13 @@ export async function GET(request: NextRequest) {
 
     const successUrl = new URL('/', baseUrl);
     successUrl.searchParams.set('success', '認証が完了しました');
-    return NextResponse.redirect(successUrl.toString());
+    const response = NextResponse.redirect(successUrl.toString());
+    response.cookies.set(
+      TOKEN_COOKIE_NAME,
+      serializeTokenCookie(tokens),
+      getTokenCookieOptions()
+    );
+    return response;
   } catch (error) {
     const errorMessage =
       error instanceof Error && error.message
